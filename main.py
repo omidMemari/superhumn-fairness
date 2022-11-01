@@ -40,7 +40,9 @@ from sklearn.metrics import balanced_accuracy_score, roc_auc_score, zero_one_los
 root = "experiments"
 
 sample_path = os.path.join(root,"samples")
-results_path = os.path.join(root,"results")
+#results_path = os.path.join(root,"results")
+train_path = os.path.join(root,"train")
+test_path = os.path.join(root,"test")
 plot_path = os.path.join(root,"results","plot")
 sample_record_filename_template = "{}_{}_{}_{}"
 
@@ -531,14 +533,14 @@ class Super_human:
       eval.append(eval_i)
     model_params = {"model":self.model_obj, "theta": self.model_obj.coef_, "alpha":self.alpha, "eval": eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "lr_alpha": self.lr_alpha, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features}
     experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, lr_alpha = self.lr_alpha, num_of_demos = self.num_of_demos) # only lr_theta!!!
-    file_dir = os.path.join(results_path)
+    file_dir = os.path.join(train_path)
     store_object(model_params, file_dir, experiment_filename)
     #np.save('eval_model.npy', eval)
     #np.save('subdom_value-'+self.learning_rate+'.npy', subdom_tensor_sum_arr)
 
   def read_model_from_file(self):
-    experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, lr_alpha = self.lr_alpha, num_of_demos = self.num_of_demos) # only lr_theta!!!
-    file_dir = os.path.join(results_path)
+    experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, lr_alpha = self.lr_alpha, num_of_demos = self.num_of_demos)
+    file_dir = os.path.join(train_path)
     self.model_params = load_object(file_dir,experiment_filename)
     self.model_obj = self.model_params["model"]
     self.theta = self.model_params["theta"]
@@ -574,8 +576,15 @@ class Super_human:
     print(eval_sh)
     print()
     print(eval_pp)
+    self.model_params["eval_sh"]= eval_sh
+    self.model_params["eval_pp"]= eval_pp
+    experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, lr_alpha = self.lr_alpha, num_of_demos = self.num_of_demos)
+    file_dir = os.path.join(test_path)
+    store_object(self.model_params, file_dir, experiment_filename)
 
 
+
+  
 
 
 
@@ -612,8 +621,6 @@ if __name__ == '__main__':
     sh_obj.read_model_from_file()
     sh_obj.test_model()
     # write test results in a file 
-
-    ### compare with post processing
 
     # Be careful! we have to make sure that we use alpha percent for both base model and demo list/
     # and test set in completely unseen!! ---> solved this problem by saving the test data and reading it back in test time.
