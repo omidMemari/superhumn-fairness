@@ -4,7 +4,9 @@ from main import Super_human, make_experiment_filename, load_object
 
 # read files in the experiment/test
 # read demo_list.pickle
-f = open("./experiments/test/Adult_0-05_0-05_100")
+#f = open("./experiments/test/Adult_0-05_0-05_100")
+
+feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference"}
 
 root = "experiments"
 test_path = os.path.join(root,"test")
