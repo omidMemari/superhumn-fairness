@@ -1,6 +1,8 @@
 
 # read files in the experiment/test
 # read demo_list.pickle
+f = open("./experiments/test/Adult_0-05_0-05_100")
+
 
 # plot zeroOne vs each fairness violations (0-1 vs dp, 0-1 vs eqOdds, ...) for both experiment/test and demo_list.pickle in one plot
 
