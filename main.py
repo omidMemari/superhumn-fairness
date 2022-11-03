@@ -39,10 +39,12 @@ from sklearn.metrics import balanced_accuracy_score, roc_auc_score, zero_one_los
 
 root = "experiments"
 
-sample_path = os.path.join(root,"samples")
+
+#sample_path = os.path.join(root,"samples")
 #results_path = os.path.join(root,"results")
-train_path = os.path.join(root,"train")
-test_path = os.path.join(root,"test")
+data_path = os.path.join(root,"data")
+train_data_path = os.path.join(root, "train")
+test_data_path = os.path.join(root, "test")
 plot_path = os.path.join(root,"results","plot")
 sample_record_filename_template = "{}_{}_{}_{}"
 
@@ -262,8 +264,10 @@ class Super_human:
     sh_demo = self.split_data(model, alpha=alpha, dataset=dataset_ref) # To get the Test data for SuperHuman approach evaluation we split data once and store the test data for evaluation: (1-alpha)% for TEST SH
     dataset_pp = dataset_ref.loc[sh_demo.idx_train] # use only pp portion of the data and leave SH Test portion
     dataset_sh = dataset_ref.loc[sh_demo.idx_test]
-    dataset_pp.to_csv("train_data.csv")
-    dataset_sh.to_csv("test_data.csv")
+    train_file_path = os.path.join(train_data_path, "train_data.csv")
+    test_file_path = os.path.join(test_data_path, "test_data.csv")
+    dataset_pp.to_csv(train_file_path)
+    dataset_sh.to_csv(test_file_path)
     for i in range(self.num_of_demos):
       r = random.randint(0, 10000000)
       #dataset_temp = shuffle(dataset_pp, random_state = r)
@@ -296,6 +300,7 @@ class Super_human:
   def read_demo_list(self):
     with open('demo_list.pickle', 'rb') as handle:
       self.demo_list = pickle.load(handle)
+    return self.demo_list
 
   def get_model_pred(self, item): # an item is one row of the dataset
     score = self.model_obj.predict_proba(item).squeeze() # [p(y = 0), p(y = 1)]
@@ -421,8 +426,10 @@ class Super_human:
     return grad_alpha
 
   def eval_model_pp(self):
-    self.train_data = pd.read_csv('train_data.csv', index_col=0).drop(columns=['prev_index'])
-    self.test_data = pd.read_csv('test_data.csv', index_col=0).drop(columns=['prev_index'])
+    train_file_path = os.path.join(train_data_path, "train_data.csv")
+    test_file_path = os.path.join(test_data_path, "test_data.csv")
+    self.train_data = pd.read_csv(train_file_path, index_col=0).drop(columns=['prev_index'])
+    self.test_data = pd.read_csv(test_file_path, index_col=0).drop(columns=['prev_index'])
     A_train = self.train_data["gender"]
     A_test = self.test_data["gender"]
     A_str_train = A_train.map({ 2:"Female", 1:"Male"})
@@ -468,7 +475,8 @@ class Super_human:
       Y = self.base_dict["Y_" + mode]
       A_str = self.base_dict["A_str_" + mode]
     elif mode == "test-sh" or mode == "test-pp":
-      self.test_data = pd.read_csv('test_data.csv', index_col=0).drop(columns=['prev_index'])
+      test_file_path = os.path.join(test_data_path, "test_data.csv")
+      self.test_data = pd.read_csv(test_file_path, index_col=0).drop(columns=['prev_index'])
       A = self.test_data["gender"]
       A_str = A.map({ 2:"Female", 1:"Male"})
       # Extract the target
@@ -533,14 +541,14 @@ class Super_human:
       eval.append(eval_i)
     model_params = {"model":self.model_obj, "theta": self.model_obj.coef_, "alpha":self.alpha, "eval": eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "lr_alpha": self.lr_alpha, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features}
     experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, lr_alpha = self.lr_alpha, num_of_demos = self.num_of_demos) # only lr_theta!!!
-    file_dir = os.path.join(train_path)
+    file_dir = os.path.join(train_data_path)
     store_object(model_params, file_dir, experiment_filename)
     #np.save('eval_model.npy', eval)
     #np.save('subdom_value-'+self.learning_rate+'.npy', subdom_tensor_sum_arr)
 
   def read_model_from_file(self):
     experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, lr_alpha = self.lr_alpha, num_of_demos = self.num_of_demos)
-    file_dir = os.path.join(train_path)
+    file_dir = os.path.join(train_data_path)
     self.model_params = load_object(file_dir,experiment_filename)
     self.model_obj = self.model_params["model"]
     self.theta = self.model_params["theta"]
@@ -579,7 +587,7 @@ class Super_human:
     self.model_params["eval_sh"]= eval_sh
     self.model_params["eval_pp"]= eval_pp
     experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, lr_alpha = self.lr_alpha, num_of_demos = self.num_of_demos)
-    file_dir = os.path.join(test_path)
+    file_dir = os.path.join(test_data_path)
     store_object(self.model_params, file_dir, experiment_filename)
 
 
