@@ -410,20 +410,48 @@ class Super_human:
     #np.save('subdom_tensor.npy', self.subdom_tensor)
     return subdom_tensor_sum, grad_theta
 
-  def compute_grad_alpha(self):
+  # def compute_grad_alpha(self):
+  #   start_time = time.time()
+  #   print("--- %s in compute_grad_alpha ---" % (time.time() - start_time))
+  #   grad_alpha = np.zeros(self.num_of_features)
+  #   for j, x in enumerate(self.demo_list):
+  #     for k in range(self.num_of_features):
+  #       sample_loss = self.sample_loss[j, k] #self.get_sample_loss(j, k)
+  #       demo_loss = self.demo_list[j].metric[k]
+  #       if self.alpha[k]*(sample_loss - demo_loss) + 1 > 0:     # subtract constant c to optimize for useful demonstation instead of avoiding from noisy ones
+  #         grad_alpha[k] += sample_loss - demo_loss
+  #   #denum = -2*self.lamda*self.num_of_demos
+  #   grad_alpha /= -2*self.lamda*self.num_of_demos
+  #   print("--- %s end of compute_grad_alpha ---" % (time.time() - start_time))
+  #   return grad_alpha
+
+  def compute_alpha(self):
     start_time = time.time()
-    print("--- %s in compute_grad_alpha ---" % (time.time() - start_time))
-    grad_alpha = np.zeros(self.num_of_features)
-    for j, x in enumerate(self.demo_list):
-      for k in range(self.num_of_features):
-        sample_loss = self.sample_loss[j, k] #self.get_sample_loss(j, k)
-        demo_loss = self.demo_list[j].metric[k]
-        if self.alpha[k]*(sample_loss - demo_loss) + 1 > 0:     # subtract constant c to optimize for useful demonstation instead of avoiding from noisy ones
-          grad_alpha[k] += sample_loss - demo_loss
-    #denum = -2*self.lamda*self.num_of_demos
-    grad_alpha /= -2*self.lamda*self.num_of_demos
-    print("--- %s end of compute_grad_alpha ---" % (time.time() - start_time))
-    return grad_alpha
+    print("--- %s in compute_alpha ---" % (time.time() - start_time))
+    alpha = np.zeros(self.num_of_features)
+  
+    for k in range(self.num_of_features):
+      dominated_demos = []
+      alpha_candidate = []
+      for j in range(self.num_of_demos):
+        sample_loss = self.sample_loss[j, k]
+        demo_loss = self.demo_list[j].metric[k] 
+        if sample_loss <= demo_loss:
+          alpha_candidate = 1.0/(demo_loss - sample_loss)
+          dominated_demos.append((alpha_candidate, demo_loss, sample_loss))
+      
+      avg_inverse_demo_loss = np.mean([1.0/x[1] for x in dominated_demos])
+      dominated_demos.sort(key = lambda x: x[0])    # sort based on demo loss
+
+      for dominated_demo in dominated_demos:
+        if (1.0/dominated_demo[2]) >= avg_inverse_demo_loss:
+          alpha[k] = dominated_demo[0]
+          break
+
+    print("--- %s end of compute_alpha ---" % (time.time() - start_time))
+    return alpha
+
+
 
   def eval_model_pp(self):
     train_file_path = os.path.join(train_data_path, "train_data.csv")
@@ -525,9 +553,10 @@ class Super_human:
       subdom_tensor_sum, grad_theta = self.compute_grad_theta() # computer gradient of loss w.r.t theta by sampling from our model
       new_theta = theta - self.lr_theta * grad_theta  # update theta using the gradinet values
       # find new alpha
-      grad_alpha = self.compute_grad_alpha()
-      new_alpha = alpha - self.lr_alpha * grad_alpha
-      print("grad_alpha: ", grad_alpha)
+      new_alpha = self.compute_alpha()
+      # grad_alpha = self.compute_grad_alpha()
+      # new_alpha = alpha - self.lr_alpha * grad_alpha
+      # print("grad_alpha: ", grad_alpha)
       print("new alpha: ", new_alpha)
       #update theta
       self.update_model_theta(new_theta)
@@ -601,7 +630,7 @@ class Super_human:
 lr_theta_list = [0.05] #[0.05, 0.1, 0.5, 1.0]
 lr_theta = 0.05
 lr_alpha = 0.05
-iters = 1
+iters = 10
 dataset = "Adult"
 num_of_demos = 100
 num_of_features = 5
