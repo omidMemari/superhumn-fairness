@@ -630,7 +630,7 @@ class Super_human:
 lr_theta_list = [0.05] #[0.05, 0.1, 0.5, 1.0]
 lr_theta = 0.05
 lr_alpha = 0.05
-iters = 10
+iters = 3
 dataset = "Adult"
 num_of_demos = 100
 num_of_features = 5
