@@ -19,16 +19,46 @@ print("file_dir: ", file_dir)
 model_params = load_object(file_dir,experiment_filename)
 demo_list = sh_obj.read_demo_list()
 
+alpha = model_params["alpha"]
+alpha = [1 / x for x in alpha]
+print(alpha)
 ### TO DO: 1) add legends to the plots
 ###        2) add solid and dashed lines
+### feature j is on the y axis and i is on the x axis
 
 for i in range(num_of_features):
     for j in range(i+1, num_of_features):
         demo_metric_i = [demo_list[z].metric[i] for z in range(len(demo_list))]
         demo_metric_j = [demo_list[z].metric[j] for z in range(len(demo_list))]
         f1 = plt.figure()
+        x = model_params['eval_sh'].loc[feature[j]][0]
+        y = model_params['eval_sh'].loc[feature[i]][0]
+        newX = x + alpha[j]
+        newY = y + alpha[i]
+        print(feature[j], " vs " ,feature[i])
+        print("x: ", x , "y: ", y)
+        print("newX: ", newX , "newY: ", newY)
+        print()
+        xlim = 0.5 #max(max(demo_metric_j), x, newX)
+        ylim = 0.5 #max(max(demo_metric_i), y, newY)
+        # xLeft is (xlim - x)*0.8 + x
+        yLeft = (ylim - y)*0.8 + y
+        xBottom = (xlim - x)*0.8 + x
         plt.plot(demo_metric_j, demo_metric_i, 'go', label = 'demo_list')
-        plt.plot(model_params['eval_sh'].loc[feature[j]], model_params['eval_sh'].loc[feature[i]], 'ro', label = 'super_human')
+        plt.plot(x, y, 'ro', label = 'super_human')
+        plt.plot([x, x], [y, ylim], 'r')
+        plt.plot([x, xlim], [y, y], 'r')
+        plt.plot([newX, newX], [newY, ylim], 'r--')
+        plt.plot([newX, xlim], [newY, newY], 'r--')
+        plt.annotate('', xy=(newX, yLeft), xytext=(x, yLeft), xycoords='data', textcoords='data',
+                     arrowprops={'arrowstyle': '<->'})
+        # write the text to the top of the arrow above
+        plt.text((newX + x) * 0.5, yLeft + yLeft*0.01, r'$\alpha_j$', horizontalalignment='center', verticalalignment='center')
+        plt.annotate('', xy=(xBottom, newY), xytext=(xBottom, y), xycoords='data', textcoords='data',
+                     arrowprops={'arrowstyle': '<->'})
+        # write the text to the right of the arrow above
+        plt.text(xBottom + xBottom*0.03, (newY + y) * 0.5, r'$\alpha_i$', horizontalalignment='center', verticalalignment='center')
+        
         plots_path_dir = os.path.join(sh_obj.plots_path, feature[j] + "_vs_"+ feature[i] + ".png")
         plt.savefig(plots_path_dir)
 
@@ -49,6 +79,7 @@ for i in range(num_of_features):
 # print(model_params['eval_sh'])
 # zero_one_sh = model_params['eval_sh'].loc[feature[0]]
 # dp_sh = model_params['eval_sh'].loc[feature[1]]
+
 # fnr_sh = model_params['eval_sh'].loc[feature[2]]
 # fpr_sh = model_params['eval_sh'].loc[feature[3]]
 # eq_odds_sh = model_params['eval_sh'].loc[feature[4]]
