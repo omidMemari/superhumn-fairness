@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference"}
+short = {"ZeroOne": "01", "Demographic parity difference": "DP", "False negative rate difference": "FN", "False positive rate difference": "FP", "Equalized odds difference": "EO"}
 lr_theta = 0.05
 lr_alpha = 0.05
 dataset = "Adult"
@@ -44,7 +45,9 @@ for i in range(num_of_features):
         # xLeft is (xlim - x)*0.8 + x
         yLeft = (ylim - y)*0.8 + y
         xBottom = (xlim - x)*0.8 + x
-        plt.plot(demo_metric_j, demo_metric_i, 'go', label = 'demo_list')
+        plt.xlabel(feature[j])
+        plt.ylabel(feature[i])
+        plt.scatter(demo_metric_j, demo_metric_i, marker='o', c=[(255/255,211/255,107/255)], label = 'demo_list')
         plt.plot(x, y, 'ro', label = 'super_human')
         plt.plot([x, x], [y, ylim], 'r')
         plt.plot([x, xlim], [y, y], 'r')
@@ -53,11 +56,12 @@ for i in range(num_of_features):
         plt.annotate('', xy=(newX, yLeft), xytext=(x, yLeft), xycoords='data', textcoords='data',
                      arrowprops={'arrowstyle': '<->'})
         # write the text to the top of the arrow above
-        plt.text((newX + x) * 0.5, yLeft + yLeft*0.01, r'$\alpha_j$', horizontalalignment='center', verticalalignment='center')
+        plt.text((newX + x) * 0.5, yLeft, fr"$1/\alpha_{{{short[feature[i]]}}}$", horizontalalignment='center', verticalalignment='bottom')
         plt.annotate('', xy=(xBottom, newY), xytext=(xBottom, y), xycoords='data', textcoords='data',
                      arrowprops={'arrowstyle': '<->'})
         # write the text to the right of the arrow above
-        plt.text(xBottom + xBottom*0.03, (newY + y) * 0.5, r'$\alpha_i$', horizontalalignment='center', verticalalignment='center')
+        plt.text(xBottom, (newY + y) * 0.5,
+                 fr"$1/\alpha_{{{short[feature[j]]}}}$", horizontalalignment='left', verticalalignment='center')
         
         plots_path_dir = os.path.join(sh_obj.plots_path, feature[j] + "_vs_"+ feature[i] + ".png")
         plt.savefig(plots_path_dir)
