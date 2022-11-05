@@ -1,4 +1,4 @@
+experiments/data/demo_list
+experiments/noise/data/demo_list
 demo_list.pickle
-demo_list_100.pickle
-demo_list_200.pickle
-demo_list_300.pickle
+data/demo_list.pickle
