@@ -285,8 +285,8 @@ class Super_human:
       dataset_temp['prev_index'] = index_list
       ##########################################################################
       new_demo = self.split_data(model, alpha=beta, dataset=dataset_temp)
-      #dataset_ref_sorted.loc[new_demo.idx_test] #works fine!
-      #print(dataset_ref.loc[new_demo.test_x["index"]]) #works fine!
+      #if self.noise == True:
+      #  new_demo.Y_test = self.add_noise(new_demo.Y_test)
       metrics = self.run_logistic_pp(model = model, data_demo = new_demo)
       self.test_pp_logi[i] = metrics
       new_demo.metric_df = metrics
@@ -303,13 +303,13 @@ class Super_human:
     #with open('demo_list.pickle', 'wb') as handle:
     #    pickle.dump(self.demo_list, handle)
 
-  def add_noise(self, dataset):
+  def add_noise(self, data):
     Y = dataset["label"].to_numpy()
     n = len(Y)
     noisy_Y = copy.deepcopy(Y)
     idx = np.random.permutation(range(len(Y)))[:int(self.noise_ratio*n)]
     noisy_Y[idx] = 1-Y[idx]
-    
+    dataset["label"] = noisy_Y
     return dataset
   
   
@@ -652,7 +652,7 @@ num_of_features = 5
 alpha = 0.5
 beta = 0.5
 model = "logistic_regression"
-noise_ratio = 0.3
+noise_ratio = 0.4
 #noise = False
 
 if __name__ == "__main__":
