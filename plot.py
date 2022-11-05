@@ -5,21 +5,23 @@ from main import Super_human, make_experiment_filename, load_object
 import matplotlib.pyplot as plt
 
 feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference"}
-root = "experiments"
-test_path = os.path.join(root,"test")
-plots_path = os.path.join(root,"plots")
+#root = "experiments"
+#test_path = os.path.join(root,"test")
+#plots_path = os.path.join(root,"plots")
 
 lr_theta = 0.05
 lr_alpha = 0.05
 dataset = "Adult"
 num_of_demos = 100
 num_of_features = 5
+noise_ratio = 0.2
+noise = False
 
+sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = noise, noise_ratio = noise_ratio)
 experiment_filename = make_experiment_filename(dataset = dataset, lr_theta = lr_theta, lr_alpha = lr_alpha, num_of_demos = num_of_demos)
-file_dir = os.path.join(test_path)
+file_dir = os.path.join(sh_obj.test_data_path)
+print("file_dir: ", file_dir)
 model_params = load_object(file_dir,experiment_filename)
-
-sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features)
 demo_list = sh_obj.read_demo_list()
 
 ### TO DO: 1) add legends to the plots
@@ -32,7 +34,7 @@ for i in range(num_of_features):
         f1 = plt.figure()
         plt.plot(demo_metric_j, demo_metric_i, 'go', label = 'demo_list')
         plt.plot(model_params['eval_sh'].loc[feature[j]], model_params['eval_sh'].loc[feature[i]], 'ro', label = 'super_human')
-        plots_path_dir = os.path.join(plots_path, feature[j] + "_vs_"+ feature[i] + ".png")
+        plots_path_dir = os.path.join(sh_obj.plots_path, feature[j] + "_vs_"+ feature[i] + ".png")
         plt.savefig(plots_path_dir)
 
 

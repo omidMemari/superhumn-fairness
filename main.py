@@ -10,6 +10,8 @@ import pickle
 import time
 from sklearn.utils import shuffle
 import warnings
+import copy
+import argparse
 from tqdm import tqdm
 warnings.filterwarnings('ignore')
 
@@ -37,15 +39,6 @@ from fairlearn.metrics import (
 from sklearn.metrics import balanced_accuracy_score, roc_auc_score, zero_one_loss
 
 
-root = "experiments"
-
-
-#sample_path = os.path.join(root,"samples")
-#results_path = os.path.join(root,"results")
-data_path = os.path.join(root,"data")
-train_data_path = os.path.join(root, "train")
-test_data_path = os.path.join(root, "test")
-plot_path = os.path.join(root,"results","plot")
 sample_record_filename_template = "{}_{}_{}_{}"
 
 
@@ -65,7 +58,7 @@ def load_object(path,name):
 
 class Super_human:
 
-  def __init__(self, dataset, num_of_demos, num_of_features, lr_alpha = 0.05, lr_theta = 0.05):
+  def __init__(self, dataset, num_of_demos, num_of_features, lr_alpha = 0.05, lr_theta = 0.05, noise = False, noise_ratio = 0.2):
     self.dataset = dataset
     self.num_of_demos = num_of_demos
     #self.num_of_samples = num_of_samples
@@ -78,6 +71,9 @@ class Super_human:
     self.c = None
     self.lr_theta = lr_theta
     self.lr_alpha = lr_alpha
+    self.noise_ratio = noise_ratio
+    self.noise = noise
+    self.set_paths()
     try:
       with open('base_model.pickle', 'rb') as handle:
           self.base_dict = pickle.load(handle)
@@ -101,6 +97,16 @@ class Super_human:
         self.idx_train = idx_train
         self.idx_test = idx_test
         self.metric = {}
+
+  def set_paths(self):
+    if self.noise:
+      root = "experiments/noise"
+    else:
+      root = "experiments"
+    self.data_path = os.path.join(root,"data")
+    self.train_data_path = os.path.join(root, "train")
+    self.test_data_path = os.path.join(root, "test")
+    self.plots_path = os.path.join(root,"plots")
 
   def base_model(self):
     
@@ -264,8 +270,8 @@ class Super_human:
     sh_demo = self.split_data(model, alpha=alpha, dataset=dataset_ref) # To get the Test data for SuperHuman approach evaluation we split data once and store the test data for evaluation: (1-alpha)% for TEST SH
     dataset_pp = dataset_ref.loc[sh_demo.idx_train] # use only pp portion of the data and leave SH Test portion
     dataset_sh = dataset_ref.loc[sh_demo.idx_test]
-    train_file_path = os.path.join(train_data_path, "train_data.csv")
-    test_file_path = os.path.join(test_data_path, "test_data.csv")
+    train_file_path = os.path.join(self.train_data_path, "train_data.csv")
+    test_file_path = os.path.join(self.test_data_path, "test_data.csv")
     dataset_pp.to_csv(train_file_path)
     dataset_sh.to_csv(test_file_path)
     for i in range(self.num_of_demos):
@@ -274,6 +280,8 @@ class Super_human:
       ##########################################################################
       index_list = dataset_pp.index.tolist()
       dataset_temp = shuffle(dataset_pp, random_state=r)
+      if self.noise == True:
+        dataset_temp = self.add_noise(dataset_temp)
       dataset_temp['prev_index'] = index_list
       ##########################################################################
       new_demo = self.split_data(model, alpha=beta, dataset=dataset_temp)
@@ -289,17 +297,30 @@ class Super_human:
       #new_demo.metric = {0: new_demo.metric_df.loc['ZeroOne']["ThresholdOptimizer"], 1: new_demo.metric_df.loc['Demographic parity difference']["ThresholdOptimizer"], 2: new_demo.metric_df.loc['False negative rate difference']["ThresholdOptimizer"]}
       self.demo_list.append(new_demo)
       print(i)
-      
-    with open('demo_list.pickle', 'wb') as handle:
-        pickle.dump(self.demo_list, handle)
-        
+
+    file_dir = os.path.join(self.data_path)
+    store_object(self.demo_list, file_dir, 'demo_list')
+    #with open('demo_list.pickle', 'wb') as handle:
+    #    pickle.dump(self.demo_list, handle)
+
+  def add_noise(self, dataset):
+    Y = dataset["label"].to_numpy()
+    n = len(Y)
+    noisy_Y = copy.deepcopy(Y)
+    idx = np.random.permutation(range(len(Y)))[:int(self.noise_ratio*n)]
+    noisy_Y[idx] = 1-Y[idx]
+    
+    return dataset
+  
   
   def read_sample_matrix(self):
     self.sample_matrix = np.load('sample_matrix.npy')
 
   def read_demo_list(self):
-    with open('demo_list.pickle', 'rb') as handle:
-      self.demo_list = pickle.load(handle)
+    file_dir = os.path.join(self.data_path)
+    self.demo_list = load_object(file_dir, 'demo_list')
+    #with open('demo_list.pickle', 'rb') as handle:
+    #  self.demo_list = pickle.load(handle)
     return self.demo_list
 
   def get_model_pred(self, item): # an item is one row of the dataset
@@ -454,8 +475,8 @@ class Super_human:
 
 
   def eval_model_pp(self):
-    train_file_path = os.path.join(train_data_path, "train_data.csv")
-    test_file_path = os.path.join(test_data_path, "test_data.csv")
+    train_file_path = os.path.join(self.train_data_path, "train_data.csv")
+    test_file_path = os.path.join(self.test_data_path, "test_data.csv")
     self.train_data = pd.read_csv(train_file_path, index_col=0).drop(columns=['prev_index'])
     self.test_data = pd.read_csv(test_file_path, index_col=0).drop(columns=['prev_index'])
     A_train = self.train_data["gender"]
@@ -503,7 +524,7 @@ class Super_human:
       Y = self.base_dict["Y_" + mode]
       A_str = self.base_dict["A_str_" + mode]
     elif mode == "test-sh" or mode == "test-pp":
-      test_file_path = os.path.join(test_data_path, "test_data.csv")
+      test_file_path = os.path.join(self.test_data_path, "test_data.csv")
       self.test_data = pd.read_csv(test_file_path, index_col=0).drop(columns=['prev_index'])
       A = self.test_data["gender"]
       A_str = A.map({ 2:"Female", 1:"Male"})
@@ -570,14 +591,14 @@ class Super_human:
       eval.append(eval_i)
     model_params = {"model":self.model_obj, "theta": self.model_obj.coef_, "alpha":self.alpha, "eval": eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "lr_alpha": self.lr_alpha, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features}
     experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, lr_alpha = self.lr_alpha, num_of_demos = self.num_of_demos) # only lr_theta!!!
-    file_dir = os.path.join(train_data_path)
+    file_dir = os.path.join(self.train_data_path)
     store_object(model_params, file_dir, experiment_filename)
     #np.save('eval_model.npy', eval)
     #np.save('subdom_value-'+self.learning_rate+'.npy', subdom_tensor_sum_arr)
 
   def read_model_from_file(self):
     experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, lr_alpha = self.lr_alpha, num_of_demos = self.num_of_demos)
-    file_dir = os.path.join(train_data_path)
+    file_dir = os.path.join(self.train_data_path)
     self.model_params = load_object(file_dir,experiment_filename)
     self.model_obj = self.model_params["model"]
     self.theta = self.model_params["theta"]
@@ -616,17 +637,11 @@ class Super_human:
     self.model_params["eval_sh"]= eval_sh
     self.model_params["eval_pp"]= eval_pp
     experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, lr_alpha = self.lr_alpha, num_of_demos = self.num_of_demos)
-    file_dir = os.path.join(test_data_path)
+    file_dir = os.path.join(self.test_data_path)
     store_object(self.model_params, file_dir, experiment_filename)
 
 
 
-  
-
-
-
-
-#lr_list = [-1.0, -0.5, -0.2, -0.1, -0.05, 0.05, 0.1, 0.2, 0.5, 1.0]
 lr_theta_list = [0.05] #[0.05, 0.1, 0.5, 1.0]
 lr_theta = 0.05
 lr_alpha = 0.05
@@ -637,30 +652,56 @@ num_of_features = 5
 alpha = 0.5
 beta = 0.5
 model = "logistic_regression"
+noise_ratio = 0.2
+#noise = False
         
 
-if __name__ == '__main__':
-  if sys.argv[1] == 'train':
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features)
-    #sh_obj.base_model()
-    sh_obj.read_demo_list()
-    for lr_theta in lr_theta_list:
-      sh_obj.update_model(lr_theta, lr_alpha, iters)
+# if __name__ == '__main__':
+#   if sys.argv[1] == 'train':
+#     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = noise, noise_ratio = noise_ratio)
+#     #sh_obj.base_model()
+#     sh_obj.read_demo_list()
+#     for lr_theta in lr_theta_list:
+#       sh_obj.update_model(lr_theta, lr_alpha, iters)
   
-  elif sys.argv[1] == 'prepare-demos':
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features)
-    sh_obj.base_model()
-    sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta) # this alpha is different from self.alpha
+#   elif sys.argv[1] == 'prepare-demos':
+#     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = noise, noise_ratio = noise_ratio)
+#     sh_obj.base_model()
+#     sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta) # this alpha is different from self.alpha
 
-  elif sys.argv[1] == "test":
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_alpha = lr_alpha, lr_theta = lr_theta)
-    #sh_obj.base_model()
-    sh_obj.read_model_from_file()
-    sh_obj.test_model()
-    # write test results in a file 
+#   elif sys.argv[1] == "test":
+#     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_alpha = lr_alpha, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
+#     #sh_obj.base_model()
+#     sh_obj.read_model_from_file()
+#     sh_obj.test_model()
+#     # write test results in a file 
 
-    # Be careful! we have to make sure that we use alpha percent for both base model and demo list/
-    # and test set in completely unseen!! ---> solved this problem by saving the test data and reading it back in test time.
+#     # Be careful! we have to make sure that we use alpha percent for both base model and demo list/
+#     # and test set in completely unseen!! ---> solved this problem by saving the test data and reading it back in test time.
 
 
 
+parser = argparse.ArgumentParser(description='Description of your program')
+parser.add_argument('-t','--task', help='enter the task to do', required=True)
+parser.add_argument('-n','--noise', help='noisy demos used if True', default=False)
+args = vars(parser.parse_args())
+
+print("noise: ", args['noise'])
+
+if args['task'] == 'prepare-demos':
+  sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = args['noise'], noise_ratio = noise_ratio)
+  sh_obj.base_model()
+  sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta) # this alpha is different from self.alpha
+
+elif args['task'] == 'train':
+  sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = args['noise'], noise_ratio = noise_ratio)
+  #sh_obj.base_model()
+  sh_obj.read_demo_list()
+  for lr_theta in lr_theta_list:
+    sh_obj.update_model(lr_theta, lr_alpha, iters)
+
+elif args['task'] == 'test':
+  sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_alpha = lr_alpha, lr_theta = lr_theta, noise = args['noise'], noise_ratio = noise_ratio)
+  #sh_obj.base_model()
+  sh_obj.read_model_from_file()
+  sh_obj.test_model()
