@@ -652,56 +652,31 @@ num_of_features = 5
 alpha = 0.5
 beta = 0.5
 model = "logistic_regression"
-noise_ratio = 0.2
+noise_ratio = 0.3
 #noise = False
-        
 
-# if __name__ == '__main__':
-#   if sys.argv[1] == 'train':
-#     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = noise, noise_ratio = noise_ratio)
-#     #sh_obj.base_model()
-#     sh_obj.read_demo_list()
-#     for lr_theta in lr_theta_list:
-#       sh_obj.update_model(lr_theta, lr_alpha, iters)
-  
-#   elif sys.argv[1] == 'prepare-demos':
-#     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = noise, noise_ratio = noise_ratio)
-#     sh_obj.base_model()
-#     sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta) # this alpha is different from self.alpha
+if __name__ == "__main__":
+  parser = argparse.ArgumentParser(description='Description of your program')
+  parser.add_argument('-t','--task', help='enter the task to do', required=True)
+  parser.add_argument('-n','--noise', help='noisy demos used if True', default=False)
+  args = vars(parser.parse_args())
 
-#   elif sys.argv[1] == "test":
-#     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_alpha = lr_alpha, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
-#     #sh_obj.base_model()
-#     sh_obj.read_model_from_file()
-#     sh_obj.test_model()
-#     # write test results in a file 
+  print("noise: ", args['noise'])
 
-#     # Be careful! we have to make sure that we use alpha percent for both base model and demo list/
-#     # and test set in completely unseen!! ---> solved this problem by saving the test data and reading it back in test time.
+  if args['task'] == 'prepare-demos':
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = args['noise'], noise_ratio = noise_ratio)
+    sh_obj.base_model()
+    sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta) # this alpha is different from self.alpha
 
+  elif args['task'] == 'train':
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = args['noise'], noise_ratio = noise_ratio)
+    #sh_obj.base_model()
+    sh_obj.read_demo_list()
+    for lr_theta in lr_theta_list:
+      sh_obj.update_model(lr_theta, lr_alpha, iters)
 
-
-parser = argparse.ArgumentParser(description='Description of your program')
-parser.add_argument('-t','--task', help='enter the task to do', required=True)
-parser.add_argument('-n','--noise', help='noisy demos used if True', default=False)
-args = vars(parser.parse_args())
-
-print("noise: ", args['noise'])
-
-if args['task'] == 'prepare-demos':
-  sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = args['noise'], noise_ratio = noise_ratio)
-  sh_obj.base_model()
-  sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta) # this alpha is different from self.alpha
-
-elif args['task'] == 'train':
-  sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = args['noise'], noise_ratio = noise_ratio)
-  #sh_obj.base_model()
-  sh_obj.read_demo_list()
-  for lr_theta in lr_theta_list:
-    sh_obj.update_model(lr_theta, lr_alpha, iters)
-
-elif args['task'] == 'test':
-  sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_alpha = lr_alpha, lr_theta = lr_theta, noise = args['noise'], noise_ratio = noise_ratio)
-  #sh_obj.base_model()
-  sh_obj.read_model_from_file()
-  sh_obj.test_model()
+  elif args['task'] == 'test':
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_alpha = lr_alpha, lr_theta = lr_theta, noise = args['noise'], noise_ratio = noise_ratio)
+    #sh_obj.base_model()
+    sh_obj.read_model_from_file()
+    sh_obj.test_model()
