@@ -56,12 +56,12 @@ for i in range(num_of_features):
         plt.annotate('', xy=(newX, yLeft), xytext=(x, yLeft), xycoords='data', textcoords='data',
                      arrowprops={'arrowstyle': '<->'})
         # write the text to the top of the arrow above
-        plt.text((newX + x) * 0.5, yLeft, fr"$1/\alpha_{{{short[feature[i]]}}}$", horizontalalignment='center', verticalalignment='bottom')
+        plt.text((newX + x) * 0.5, yLeft, fr"$1/\alpha_{{{short[feature[j]]}}}$", horizontalalignment='center', verticalalignment='bottom')
         plt.annotate('', xy=(xBottom, newY), xytext=(xBottom, y), xycoords='data', textcoords='data',
                      arrowprops={'arrowstyle': '<->'})
         # write the text to the right of the arrow above
         plt.text(xBottom, (newY + y) * 0.5,
-                 fr"$1/\alpha_{{{short[feature[j]]}}}$", horizontalalignment='left', verticalalignment='center')
+                 fr"$1/\alpha_{{{short[feature[i]]}}}$", horizontalalignment='left', verticalalignment='center')
         
         plots_path_dir = os.path.join(sh_obj.plots_path, feature[j] + "_vs_"+ feature[i] + ".png")
         plt.savefig(plots_path_dir)
