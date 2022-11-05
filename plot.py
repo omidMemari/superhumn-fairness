@@ -1,23 +1,18 @@
-
 import os
 import pickle
 from main import Super_human, make_experiment_filename, load_object
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference"}
-#root = "experiments"
-#test_path = os.path.join(root,"test")
-#plots_path = os.path.join(root,"plots")
-
 lr_theta = 0.05
 lr_alpha = 0.05
 dataset = "Adult"
 num_of_demos = 100
 num_of_features = 5
-noise_ratio = 0.2
 noise = False
 
-sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = noise, noise_ratio = noise_ratio)
+sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = noise)
 experiment_filename = make_experiment_filename(dataset = dataset, lr_theta = lr_theta, lr_alpha = lr_alpha, num_of_demos = num_of_demos)
 file_dir = os.path.join(sh_obj.test_data_path)
 print("file_dir: ", file_dir)
