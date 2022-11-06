@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference"}
-short = {"ZeroOne": "01", "Demographic parity difference": "DP", "False negative rate difference": "FN", "False positive rate difference": "FP", "Equalized odds difference": "EO"}
+short = {"ZeroOne": "0-1", "Demographic parity difference": "DP", "False negative rate difference": "FNR", "False positive rate difference": "FPR", "Equalized odds difference": "EqOdds"}
 lr_theta = 0.05
 lr_alpha = 0.05
 dataset = "Adult"
@@ -63,7 +63,7 @@ for i in range(num_of_features):
         plt.text(xBottom, (newY + y) * 0.5,
                  fr"$1/\alpha_{{{short[feature[i]]}}}$", horizontalalignment='left', verticalalignment='center')
         
-        plots_path_dir = os.path.join(sh_obj.plots_path, feature[j] + "_vs_"+ feature[i] + ".png")
+        plots_path_dir = os.path.join(sh_obj.plots_path, short[feature[j]] + "_vs_"+ short[feature[i]] + ".png")
         plt.savefig(plots_path_dir)
 
 
