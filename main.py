@@ -58,7 +58,7 @@ def load_object(path,name):
 
 class Super_human:
 
-  def __init__(self, dataset, num_of_demos, num_of_features, lr_alpha = 0.05, lr_theta = 0.05, noise = False, noise_ratio = 0.2):
+  def __init__(self, dataset, num_of_demos, num_of_features, lr_alpha = 0.05, lr_theta = 0.05, noise=False, noise_ratio = 0.2):
     self.dataset = dataset
     self.num_of_demos = num_of_demos
     #self.num_of_samples = num_of_samples
@@ -103,6 +103,7 @@ class Super_human:
       root = "experiments/noise"
     else:
       root = "experiments"
+    print("root: ", root)
     self.data_path = os.path.join(root,"data")
     self.train_data_path = os.path.join(root, "train")
     self.test_data_path = os.path.join(root, "test")
@@ -303,7 +304,7 @@ class Super_human:
     #with open('demo_list.pickle', 'wb') as handle:
     #    pickle.dump(self.demo_list, handle)
 
-  def add_noise(self, data):
+  def add_noise(self, dataset):
     Y = dataset["label"].to_numpy()
     n = len(Y)
     noisy_Y = copy.deepcopy(Y)
@@ -318,6 +319,7 @@ class Super_human:
 
   def read_demo_list(self):
     file_dir = os.path.join(self.data_path)
+    print("file_dir in read_demo_list: ", file_dir)
     self.demo_list = load_object(file_dir, 'demo_list')
     #with open('demo_list.pickle', 'rb') as handle:
     #  self.demo_list = pickle.load(handle)
@@ -643,16 +645,16 @@ class Super_human:
 
 
 lr_theta_list = [0.05] #[0.05, 0.1, 0.5, 1.0]
-lr_theta = 0.05
+lr_theta = 0.01
 lr_alpha = 0.05
-iters = 3
+iters = 20
 dataset = "Adult"
 num_of_demos = 100
 num_of_features = 5
 alpha = 0.5
 beta = 0.5
 model = "logistic_regression"
-noise_ratio = 0.4
+noise_ratio = 0.2
 #noise = False
 
 if __name__ == "__main__":
@@ -661,22 +663,23 @@ if __name__ == "__main__":
   parser.add_argument('-n','--noise', help='noisy demos used if True', default=False)
   args = vars(parser.parse_args())
 
-  print("noise: ", args['noise'])
+  noise = eval(args['noise'])
+  print("noise: ", noise)
+  print("noise type: ", type(noise))
 
   if args['task'] == 'prepare-demos':
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = args['noise'], noise_ratio = noise_ratio)
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = noise, noise_ratio = noise_ratio)
     sh_obj.base_model()
     sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta) # this alpha is different from self.alpha
 
   elif args['task'] == 'train':
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = args['noise'], noise_ratio = noise_ratio)
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = noise, noise_ratio = noise_ratio)
     #sh_obj.base_model()
     sh_obj.read_demo_list()
-    for lr_theta in lr_theta_list:
-      sh_obj.update_model(lr_theta, lr_alpha, iters)
+    sh_obj.update_model(lr_theta, lr_alpha, iters)
 
   elif args['task'] == 'test':
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_alpha = lr_alpha, lr_theta = lr_theta, noise = args['noise'], noise_ratio = noise_ratio)
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_alpha = lr_alpha, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
     #sh_obj.base_model()
     sh_obj.read_model_from_file()
     sh_obj.test_model()
