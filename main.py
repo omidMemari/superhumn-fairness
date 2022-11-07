@@ -465,10 +465,14 @@ class Super_human:
       
       avg_inverse_demo_loss = np.mean([1.0/x[1] for x in dominated_demos])
       dominated_demos.sort(key = lambda x: x[0])    # sort based on demo loss
+      dominated_demos = np.array(dominated_demos)
 
-      for dominated_demo in dominated_demos:
-        if (1.0/dominated_demo[2]) >= avg_inverse_demo_loss:
-          alpha[k] = dominated_demo[0]
+      for m, demo in enumerate(dominated_demos):
+        print("dominated_demo ", demo)
+        print("m ", m)
+        print("dominated_demos[0:m+1] ", dominated_demos[0:m+1])
+        if (1.0/demo[2]) >= np.mean([1.0/x[1] for x in dominated_demos[0:m+1]]): #avg_inverse_demo_loss:
+          alpha[k] = demo[0]
           break
 
     print("--- %s end of compute_alpha ---" % (time.time() - start_time))
@@ -649,7 +653,7 @@ lr_theta = 0.01
 lr_alpha = 0.05
 iters = 20
 dataset = "Adult"
-num_of_demos = 100
+num_of_demos = 200
 num_of_features = 5
 alpha = 0.5
 beta = 0.5
