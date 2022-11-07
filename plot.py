@@ -10,7 +10,7 @@ short = {"ZeroOne": "0-1", "Demographic parity difference": "DP", "False negativ
 lr_theta = 0.01
 lr_alpha = 0.05
 dataset = "Adult"
-num_of_demos = 100
+num_of_demos = 200
 num_of_features = 5
 #noise = True
 
