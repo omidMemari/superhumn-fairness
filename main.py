@@ -488,7 +488,7 @@ class Super_human:
 
 
 
-  def eval_model_pp(self):
+  def eval_model_pp(self, mode="demographic_parity"):
     train_file_path = os.path.join(self.train_data_path, "train_data.csv")
     test_file_path = os.path.join(self.test_data_path, "test_data.csv")
     self.train_data = pd.read_csv(train_file_path, index_col=0).drop(columns=['prev_index'])
@@ -509,7 +509,7 @@ class Super_human:
     # Post-processing
     postprocess_est = ThresholdOptimizer(
         estimator=model_logi,
-        constraints="demographic_parity", #"equalized_odds",
+        constraints=mode, #"equalized_odds",
         predict_method='auto',
         prefit=True)
     # Balanced data set is obtained by sampling the same number of points from the majority class (Y=0)
@@ -643,13 +643,15 @@ class Super_human:
 
   def test_model(self):
     eval_sh = self.eval_model(mode = "test-sh")
-    eval_pp = self.eval_model_pp()
+    eval_pp_dp = self.eval_model_pp(mode = "demographic_parity")
+    eval_pp_eq_odds = self.eval_model_pp(mode = "equalized_odds")
     print()
     print(eval_sh)
     print()
-    print(eval_pp)
+    print(eval_pp_dp)
     self.model_params["eval_sh"]= eval_sh
-    self.model_params["eval_pp"]= eval_pp
+    self.model_params["eval_pp_dp"]= eval_pp_dp
+    self.model_params["eval_pp_eq_odds"] = eval_pp_eq_odds
     experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, lr_alpha = self.lr_alpha, num_of_demos = self.num_of_demos)
     file_dir = os.path.join(self.test_data_path)
     store_object(self.model_params, file_dir, experiment_filename)
