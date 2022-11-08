@@ -11,6 +11,7 @@ import time
 from sklearn.utils import shuffle
 import warnings
 import copy
+import math
 import argparse
 from tqdm import tqdm
 warnings.filterwarnings('ignore')
@@ -459,19 +460,26 @@ class Super_human:
       for j in range(self.num_of_demos):
         sample_loss = self.sample_loss[j, k]
         demo_loss = self.demo_list[j].metric[k] 
+        #print("sample_loss: ", sample_loss)
+        #print("demo_loss: ", demo_loss)
+        #print("(demo_loss - sample_loss): ", (demo_loss - sample_loss))
         if sample_loss <= demo_loss:
           alpha_candidate = 1.0/(demo_loss - sample_loss)
-          dominated_demos.append((alpha_candidate, demo_loss, sample_loss))
+          if not math.isinf(alpha_candidate):
+            dominated_demos.append((alpha_candidate, demo_loss, sample_loss))
       
-      avg_inverse_demo_loss = np.mean([1.0/x[1] for x in dominated_demos])
-      dominated_demos.sort(key = lambda x: x[0])    # sort based on demo loss
+      #avg_inverse_demo_loss = np.mean([1.0/x[1] for x in dominated_demos])
+      dominated_demos.sort(key = lambda x: x[0], reverse=True)    # sort based on demo loss
       dominated_demos = np.array(dominated_demos)
 
       for m, demo in enumerate(dominated_demos):
+        #avg_inverse_demo_loss = [1.0/x[1] for x in dominated_demos[0:m+1]]
+        #if demo[2] == 0 or 
         print("dominated_demo ", demo)
         print("m ", m)
         print("dominated_demos[0:m+1] ", dominated_demos[0:m+1])
         if (1.0/demo[2]) >= np.mean([1.0/x[1] for x in dominated_demos[0:m+1]]): #avg_inverse_demo_loss:
+          print("in if, dominated_demo ", demo)
           alpha[k] = demo[0]
           break
 
@@ -651,7 +659,7 @@ class Super_human:
 lr_theta_list = [0.05] #[0.05, 0.1, 0.5, 1.0]
 lr_theta = 0.01
 lr_alpha = 0.05
-iters = 20
+iters = 10
 dataset = "Adult"
 num_of_demos = 200
 num_of_features = 5
