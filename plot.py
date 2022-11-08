@@ -30,7 +30,7 @@ if __name__ == "__main__":
     alpha = model_params["alpha"]
     print("alpha: ", alpha)
     alpha = [1 / x for x in alpha]
-    print(alpha)
+    print(model_params)
     ### TO DO: 1) add legends to the plots
     ###        2) add solid and dashed lines
     ### feature j is on the y axis and i is on the x axis
@@ -42,21 +42,20 @@ if __name__ == "__main__":
             f1 = plt.figure()
             x = model_params['eval_sh'].loc[feature[j]][0]
             y = model_params['eval_sh'].loc[feature[i]][0]
+            x_pp = model_params['eval_pp'].loc[feature[j]][0]
+            y_pp = model_params['eval_pp'].loc[feature[i]][0]
             newX = x + alpha[j]
             newY = y + alpha[i]
-            print(feature[j], " vs " ,feature[i])
-            print("x: ", x , "y: ", y)
-            print("newX: ", newX , "newY: ", newY)
-            print()
-            xlim = 0.5 #max(max(demo_metric_j), x, newX)
-            ylim = 0.5 #max(max(demo_metric_i), y, newY)
+            xlim = max(max(demo_metric_j), newX)*1.2
+            ylim = max(max(demo_metric_i), newY)*1.2
             # xLeft is (xlim - x)*0.8 + x
             yLeft = (ylim - y)*0.8 + y
             xBottom = (xlim - x)*0.8 + x
             plt.xlabel(feature[j])
             plt.ylabel(feature[i])
-            plt.scatter(demo_metric_j, demo_metric_i, marker='o', c=[(255/255,211/255,107/255)], label = 'demo_list')
+            plt.scatter(demo_metric_j, demo_metric_i, marker='*', c=[(255/255,211/255,107/255)], label = 'post_proc_demos')
             plt.plot(x, y, 'ro', label = 'super_human')
+            plt.plot(x_pp, y_pp, 'bo', label = 'post_processing')
             plt.plot([x, x], [y, ylim], 'r')
             plt.plot([x, xlim], [y, y], 'r')
             plt.plot([newX, newX], [newY, ylim], 'r--')
@@ -71,5 +70,11 @@ if __name__ == "__main__":
             plt.text(xBottom, (newY + y) * 0.5,
                     fr"$1/\alpha_{{{short[feature[i]]}}}$", horizontalalignment='left', verticalalignment='center')
             
+            handles, labels = plt.gca().get_legend_handles_labels()
+            #plt.xlabel('Fairness Violation')
+            #plt.ylabel('NDCG')
+            plt.grid(True)
+            plt.legend(reversed(handles), reversed(labels),loc='upper right', ncol=1, fontsize="small")
+            plt.title(dataset)
             plots_path_dir = os.path.join(sh_obj.plots_path, short[feature[j]] + "_vs_"+ short[feature[i]] + ".png")
             plt.savefig(plots_path_dir)
