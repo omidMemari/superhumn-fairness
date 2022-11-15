@@ -10,7 +10,7 @@ short = {"ZeroOne": "0-1", "Demographic parity difference": "DP", "False negativ
 lr_theta = 0.01
 lr_alpha = 0.05
 dataset = "Adult"
-num_of_demos = 200
+num_of_demos = 100
 num_of_features = 5
 #noise = True
 
@@ -26,10 +26,10 @@ if __name__ == "__main__":
     print("file_dir: ", file_dir)
     model_params = load_object(file_dir,experiment_filename)
     demo_list = sh_obj.read_demo_list()
-    
     alpha = model_params["alpha"]
     print("alpha: ", alpha)
     alpha = [1 / x for x in alpha]
+    print(alpha)
     print(model_params)
     ### TO DO: 1) add legends to the plots
     ###        2) add solid and dashed lines
