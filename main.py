@@ -460,26 +460,17 @@ class Super_human:
       for j in range(self.num_of_demos):
         sample_loss = self.sample_loss[j, k]
         demo_loss = self.demo_list[j].metric[k] 
-        #print("sample_loss: ", sample_loss)
-        #print("demo_loss: ", demo_loss)
-        #print("(demo_loss - sample_loss): ", (demo_loss - sample_loss))
         if sample_loss <= demo_loss:
           alpha_candidate = 1.0/(demo_loss - sample_loss)
           if not math.isinf(alpha_candidate):
             dominated_demos.append((alpha_candidate, demo_loss, sample_loss))
       
       #avg_inverse_demo_loss = np.mean([1.0/x[1] for x in dominated_demos])
-      dominated_demos.sort(key = lambda x: x[0], reverse=True)    # sort based on demo loss
+      dominated_demos.sort(key = lambda x: x[0]) #dominated_demos.sort(key = lambda x: x[0], reverse=True)   # sort based on demo loss
       dominated_demos = np.array(dominated_demos)
 
       for m, demo in enumerate(dominated_demos):
-        #avg_inverse_demo_loss = [1.0/x[1] for x in dominated_demos[0:m+1]]
-        #if demo[2] == 0 or 
-        print("dominated_demo ", demo)
-        print("m ", m)
-        print("dominated_demos[0:m+1] ", dominated_demos[0:m+1])
-        if (1.0/demo[2]) >= np.mean([1.0/x[1] for x in dominated_demos[0:m+1]]): #avg_inverse_demo_loss:
-          print("in if, dominated_demo ", demo)
+        if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]]): ###if (1.0/demo[2]) >= np.mean([1.0/x[1] for x in dominated_demos[0:m+1]]):
           alpha[k] = demo[0]
           break
 
@@ -576,7 +567,7 @@ class Super_human:
     self.lr_theta = lr_theta
     self.lr_alpha = lr_alpha
     self.grad_theta, subdom_tensor_sum_arr, eval = [], [], []
-    for i in range(iters):
+    for i in tqdm(range(iters)):
       # find sample loss and store it, we will use it for computing grad_theta and grad_alpha
       self.sample_superhuman() # update self.sample_matrix with new samples from new theta
       self.get_samples_demo_indexed()
@@ -661,9 +652,9 @@ class Super_human:
 lr_theta_list = [0.05] #[0.05, 0.1, 0.5, 1.0]
 lr_theta = 0.01
 lr_alpha = 0.05
-iters = 10
+iters = 30
 dataset = "Adult"
-num_of_demos = 200
+num_of_demos = 100
 num_of_features = 5
 alpha = 0.5
 beta = 0.5
