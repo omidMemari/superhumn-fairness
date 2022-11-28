@@ -75,6 +75,7 @@ class Super_human:
     self.noise_ratio = noise_ratio
     self.noise = noise
     self.set_paths()
+    """
     try:
       with open('base_model.pickle', 'rb') as handle:
           self.base_dict = pickle.load(handle)
@@ -84,7 +85,8 @@ class Super_human:
           self.pred_scores = self.base_dict["pred_scores"]
     except Exception:
       self.base_model()
-    
+    """
+
   class data_demo:
     def __init__(self, train_x=None, test_x=None, train_y=None, test_y=None, train_A=None, test_A=None, train_A_str=None, test_A_str=None ,idx_train=None, idx_test=None):
         self.train_x = train_x
@@ -120,14 +122,30 @@ class Super_human:
         'max_iter': 1000
     }
 
-    # Extract the sensitive feature
-    self.dataset_ref = self.dataset_ref.reset_index(drop=True)
-    A = self.dataset_ref["gender"]
+    train_file_path = os.path.join(self.train_data_path, "train_data.csv")
+    self.train_data = pd.read_csv(train_file_path, index_col=0)
+    A = self.train_data["gender"]
     A_str = A.map({ 2:"Female", 1:"Male"})
     # Extract the target
-    Y = self.dataset_ref["label"]
-    df_train, df_test, Y_train, Y_test, A_train, A_test, A_str_train, A_str_test = train_test_split(
-        self.dataset_ref.drop(columns=['label']), ####self.dataset_ref.drop(columns=['gender', 'label']),
+    Y = self.train_data["label"]
+    X = self.train_data.drop(columns=['label'])
+
+    #model_logi = LogisticRegression(**self.logi_params)
+    #model_logi.fit(X_train, Y_train)
+
+    
+    #self.train_data = pd.read_csv(train_file_path, index_col=0).drop(columns=['label'])
+    # Extract the sensitive feature
+    #dataset_ref = self.train_data.copy(deep=True).reset_index(drop=True)
+    #dataset_ref = self.add_noise(dataset_ref)
+    #A = dataset_ref["gender"]
+    #A_str = A.map({ 2:"Female", 1:"Male"})
+    # Extract the target
+    #Y = dataset_ref["label"]
+    
+    
+    X_train, X_test, Y_train, Y_test, A_train, A_test, A_str_train, A_str_test = train_test_split(
+        X,
         Y,
         A,
         A_str,
@@ -135,18 +153,18 @@ class Super_human:
         random_state=12345,
         stratify=Y
         )
-
+    
     self.model_obj = LogisticRegression(**self.logi_params)
-    self.model_obj.fit(df_train, Y_train)
+    self.model_obj.fit(X_train, Y_train)
     # Scores on test set
-    self.pred_scores = self.model_obj.predict_proba(self.dataset_ref.drop(columns=['label'])) #self.pred_scores = self.model_obj.predict_proba(self.dataset_ref.drop(columns=['gender', 'label']))#[:, 1]
+    self.pred_scores = self.model_obj.predict_proba(X_test) #self.pred_scores = self.model_obj.predict_proba(self.dataset_ref.drop(columns=['gender', 'label']))#[:, 1]
     self.base_dict = {"model_obj": self.model_obj,
                  "pred_scores": self.pred_scores,
                  "model_name": self.model_name,
                  "logi_params": self.logi_params,
-                 "X_train": df_train,
+                 "X_train": X_train,
                  "Y_train": Y_train,
-                 "X_test": df_test,
+                 "X_test": X_test,
                  "Y_test": Y_test,
                  "A_str_train": A_str_train,
                  "A_str_test": A_str_test}
@@ -224,18 +242,26 @@ class Super_human:
               "ThresholdOptimizer": (postprocess_preds, postprocess_preds)}
     return get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test)
 
-  def split_data(self, model, alpha=0.5, dataset=None):
+  def split_data(self, model, alpha=0.5, dataset=None,  mode="post-processing"):
     # Assign dataset to temporary variable
-    dataset_temp = dataset
+    dataset_temp = dataset.copy(deep=True)
     # Extract the sensitive feature
     #dataset_temp.reset_index(inplace=True, drop=True)
     A = dataset_temp["gender"]
     A_str = A.map({ 2:"Female", 1:"Male"})
     # Extract the target
     Y = dataset_temp["label"]
-    #################################### CHANGED HERE
-    idx = dataset_temp["prev_index"]
+    
+    ####################################
+    if mode == "post-processing":
+      dataset_temp.drop(columns=['gender'])
+      if 'prev_index' in dataset_temp.columns:
+        idx = dataset_temp["prev_index"]
+        dataset_temp = dataset_temp.drop(columns=['prev_index'])
+    elif mode == "normal":
+      idx = dataset_temp.index.tolist()
     ###################################
+    X = dataset_temp.drop(columns=['label'])
     #idx = dataset_temp["index"]
     
     # TRAIN TEST SPLIT
@@ -243,7 +269,7 @@ class Super_human:
     # beta is the percentage of train Post Processing and 1 - beta is percentage of Test Post Processing
     
     df_train, df_test, Y_train, Y_test, A_train, A_test, A_str_train, A_str_test, idx_train, idx_test = train_test_split(
-        dataset_temp.drop(columns=['prev_index', 'gender', 'label']),
+        X,
         Y,
         A,
         A_str,
@@ -257,36 +283,60 @@ class Super_human:
     return new_demo
 
   def prepare_test_pp(self, model = "logistic_regression", alpha = 0.5, beta = 0.5):
+    self.dataset_ref = pd.read_csv('dataset_ref.csv', index_col=0)
     dataset_ref = self.dataset_ref.copy(deep=True)
     #self.test_pp_logi = pd.DataFrame(index = ['Demographic parity difference', 'False negative rate difference', 'ZeroOne'])
     self.test_pp_logi = pd.DataFrame(index = [self.feature[i] for i in range(self.num_of_features)])
     self.demo_list = []
     r = random.randint(0, 10000000)
-    #dataset_ref = shuffle(dataset_ref, random_state = r)
-    #################################### CHANGED HERE
-    index_list = dataset_ref.index.tolist()
+    #index_list = dataset_ref.index.tolist()
     dataset_ref = shuffle(dataset_ref, random_state=r)
-    dataset_ref['prev_index'] = index_list
     ####################################
-    #dataset_ref = dataset_ref.reset_index() # leave index as a column to keep track of index change
-    sh_demo = self.split_data(model, alpha=alpha, dataset=dataset_ref) # To get the Test data for SuperHuman approach evaluation we split data once and store the test data for evaluation: (1-alpha)% for TEST SH
-    dataset_pp = dataset_ref.loc[sh_demo.idx_train] # use only pp portion of the data and leave SH Test portion
-    dataset_sh = dataset_ref.loc[sh_demo.idx_test]
+    A = dataset_ref["gender"]
+    A_str = A.map({ 2:"Female", 1:"Male"})
+    Y = dataset_ref["label"]
+    idx = dataset_ref.index.tolist()
+    X = dataset_ref.drop(columns=['label'])
+    df_train, df_test, Y_train, Y_test, A_train, A_test, A_str_train, A_str_test, idx_train, idx_test = train_test_split(
+        X,
+        Y,
+        A,
+        A_str,
+        idx,
+        test_size = 1 - alpha,
+        random_state=12345,
+        stratify=Y
+        )
+
+    dataset_pp = dataset_ref.loc[idx_train].reset_index(drop=True) # use only pp portion of the data and leave SH Test portion
+    dataset_sh = dataset_ref.loc[idx_test].reset_index(drop=True)
     train_file_path = os.path.join(self.train_data_path, "train_data.csv")
     test_file_path = os.path.join(self.test_data_path, "test_data.csv")
     dataset_pp.to_csv(train_file_path)
     dataset_sh.to_csv(test_file_path)
+    dataset_pp_copy = dataset_pp.copy(deep=True)
+    """
+    sh_demo = self.split_data(model, alpha=alpha, dataset=dataset_ref, mode="normal") # To get the Test data for SuperHuman approach evaluation we split data once and store the test data for evaluation: (1-alpha)% for TEST SH
+    dataset_pp = dataset_ref.loc[sh_demo.idx_train].reset_index(drop=True) # use only pp portion of the data and leave SH Test portion
+    dataset_sh = dataset_ref.loc[sh_demo.idx_test].reset_index(drop=True)
+    train_file_path = os.path.join(self.train_data_path, "train_data.csv")
+    test_file_path = os.path.join(self.test_data_path, "test_data.csv")
+    dataset_pp.to_csv(train_file_path)
+    dataset_sh.to_csv(test_file_path)
+    dataset_pp_copy = dataset_pp.copy(deep=True)
+    """
     for i in range(self.num_of_demos):
       r = random.randint(0, 10000000)
       #dataset_temp = shuffle(dataset_pp, random_state = r)
       ##########################################################################
-      index_list = dataset_pp.index.tolist()
-      dataset_temp = shuffle(dataset_pp, random_state=r)
+
+      index_list = dataset_pp_copy.index.tolist()
+      dataset_temp = shuffle(dataset_pp_copy, random_state=r)
       if self.noise == True:
         dataset_temp = self.add_noise(dataset_temp)
       dataset_temp['prev_index'] = index_list
       ##########################################################################
-      new_demo = self.split_data(model, alpha=beta, dataset=dataset_temp)
+      new_demo = self.split_data(model, alpha=beta, dataset=dataset_temp,  mode="post-processing")
       #if self.noise == True:
       #  new_demo.Y_test = self.add_noise(new_demo.Y_test)
       metrics = self.run_logistic_pp(model = model, data_demo = new_demo)
@@ -338,14 +388,22 @@ class Super_human:
 
   def sample_superhuman(self):
     start_time = time.time()
-    X = self.dataset_ref.drop(columns=['label']).to_numpy()
-    data_size, feature_size = self.dataset_ref.shape
+    train_file_path = os.path.join(self.train_data_path, "train_data.csv")
+    self.train_data = pd.read_csv(train_file_path, index_col=0)
+    X = self.train_data.drop(columns=['label']).to_numpy()
+
+    #X = self.dataset_ref.drop(columns=['label']).to_numpy() #X = self.train_data.to_numpy()
+    data_size, feature_size = self.train_data.shape
     self.sample_matrix = np.zeros((self.num_of_demos, data_size)) #np.array([[-1 for _ in range(data_size)] for _ in range(num_of_samples)]) # create a matrix of size [num_of_samples * data_set_size]. Each row is a sample from our model that predicts the label of dataset.
-    print("--- %s in sample_superhuman ---" % (time.time() - start_time))
+    #print("--- %s in sample_superhuman ---" % (time.time() - start_time))
     for j in range(data_size):
       probs = self.get_model_pred(item = [X[j]]) #probs = self.get_model_pred(item = [self.dataset_ref.drop(columns=['label']).loc[j]])
       self.sample_matrix[:,j] = self.sample_from_prob(dist = probs, size = self.num_of_demos) # return a vector of size num_of_samples (100) with label prediction samples for j_th item of the dataset
+      
     
+    print("sample_matrix size: ", self.sample_matrix.shape)
+    print("self.sample_matrix[:,0]", self.sample_matrix[:,0])
+    print("self.dataset_ref['label]", self.dataset_ref["label"].loc[0])
     print("--- %s end of sample_superhuman ---" % (time.time() - start_time))
     return self.sample_matrix
 
@@ -354,25 +412,43 @@ class Super_human:
     sample_size = self.demo_list[0].idx_test.size
     self.sample_matrix_demo_indexed = np.zeros((self.num_of_demos, sample_size))
     
+
+    #train_file_path = os.path.join(self.train_data_path, "train_data.csv")
+    #self.train_data = pd.read_csv(train_file_path, index_col=0).drop(columns=['label'])
+    #X = self.train_data.drop(columns=['label'])
     for i in range(self.num_of_demos):
       demo = self.demo_list[i]
+      #len(demo.idx_test.merge(B)) == len(A)
+      #print("self.train_data['prev_index']: ", self.train_data['prev_index']).to_numpy())
+      #print("demo.idx_test: ", demo.idx_test.to_numpy())############################################################################################################
       self.sample_matrix_demo_indexed[i,:] = self.sample_matrix[i,:][demo.idx_test]
     return self.sample_matrix_demo_indexed
     
 
   def get_sample_loss(self):
     start_time = time.time()
-    print("--- %s in get_sample_loss ---" % (time.time() - start_time))
+    #print("--- %s in get_sample_loss ---" % (time.time() - start_time))
     self.sample_loss = np.zeros((self.num_of_demos, self.num_of_features))
     for demo_index, x in enumerate(tqdm(self.demo_list)):
+      demo = self.demo_list[demo_index]
+      sample_preds = self.sample_matrix_demo_indexed[demo_index,:]
+      #print("sample_preds", sample_preds.shape)
+      #print("sample_preds: ", sample_preds)
+      # Metrics
+      models_dict = {"Super_human": (sample_preds, sample_preds)}
+      y = self.train_data.loc[demo.idx_test]['label'] # we use true_y from original dataset since y_true in demo can be noisy (in noise setting)
+      A = self.train_data.loc[demo.idx_test]["gender"]
+      A_str = A.map({ 2:"Female", 1:"Male"})
+      
+      metric_df = get_metrics_df(models_dict = models_dict, y_true = y, group = A_str) #### takes so much time!!! #metric_df = get_metrics_df(models_dict = models_dict, y_true = demo.test_y, group = demo.test_A_str)
       for feature_index in range(self.num_of_features):
-        demo = self.demo_list[demo_index]
-        sample_preds = self.sample_matrix_demo_indexed[demo_index,:]
-        # Metrics
-        models_dict = {"ThresholdOptimizer": (sample_preds, sample_preds)}
-        metric_df = get_metrics_df(models_dict = models_dict, y_true = demo.test_y, group = demo.test_A_str) #### takes so much time!!!
-        self.sample_loss[demo_index, feature_index] = metric_df.loc[self.feature[feature_index]]["ThresholdOptimizer"] #metric[feature_index]
+        self.sample_loss[demo_index, feature_index] = metric_df.loc[self.feature[feature_index]]["Super_human"] #metric[feature_index]
+    
+    print("sample_loss for 0-1: ", self.sample_loss[:,0])
+    print("sample_loss for dp: ", self.sample_loss[:,1])
+    print("sample_loss for EqOdds: ", self.sample_loss[:,4])
     print("--- %s end of get_sample_loss ---" % (time.time() - start_time))
+
   def get_demo_loss(self, demo_index, feature_index):
     demo_loss =self.demo_list[demo_index].metric[feature_index]
     return demo_loss
@@ -387,23 +463,27 @@ class Super_human:
     return self.subdom_tensor
 
   def compute_exp_phi_X_Y(self):
-      X = self.dataset_ref.drop(columns=['label'])
-      self.exp_phi_X_Y = [0 for _ in range(self.num_of_attributs)]
-      self.phi_X_Y = []
-      
-      for i in range(self.num_of_demos):
-        demo = self.demo_list[i]
-        sample_Y = self.sample_matrix_demo_indexed[i,:]
-        phi_X_Y_temp = np.reshape(sample_Y, (-1, 1)) * X.loc[demo.idx_test]
-        phi_X_Y_temp = np.sum(phi_X_Y_temp, axis=0) / X.shape[0]
-
-        self.phi_X_Y.append(phi_X_Y_temp)
-        self.exp_phi_X_Y += phi_X_Y_temp
-      self.exp_phi_X_Y /= self.num_of_demos  # get the average
+    train_file_path = os.path.join(self.train_data_path, "train_data.csv")
+    self.train_data = pd.read_csv(train_file_path, index_col=0)
+    X = self.train_data.drop(columns=['label']) #self.dataset_ref.drop(columns=['label'])
+    self.exp_phi_X_Y = [0 for _ in range(self.num_of_attributs)]
+    self.phi_X_Y = []
+    #print("X: ", X.head())
+    #print("exp_phi_X_Y: ", self.exp_phi_X_Y.shape)
+    for i in range(self.num_of_demos):
+      demo = self.demo_list[i]
+      sample_Y = self.sample_matrix_demo_indexed[i,:]
+      phi_X_Y_temp = np.reshape(sample_Y, (-1, 1)) * X.loc[demo.idx_test]
+      phi_X_Y_temp = np.sum(phi_X_Y_temp, axis=0) / X.shape[0]
+      #print("phi_X_Y_temp: ", np.shape(phi_X_Y_temp))
+      #print("self.exp_phi_X_Y: ", np.shape(self.exp_phi_X_Y))
+      self.phi_X_Y.append(phi_X_Y_temp)
+      self.exp_phi_X_Y += phi_X_Y_temp
+    self.exp_phi_X_Y /= self.num_of_demos  # get the average
 
   def feature_matching(self, demo_index):
     demo = self.demo_list[demo_index]
-    X_demoIndexed = self.dataset_ref.drop(columns=['label']).loc[demo.idx_test]
+    X_demoIndexed = self.train_data.drop(columns=['label']).loc[demo.idx_test] #self.dataset_ref.drop(columns=['label']).loc[demo.idx_test]
     sample_Y_demoIndexed = self.sample_matrix_demo_indexed[demo_index,:]#[demo.idx_test]
     phi_X_Y = np.reshape(sample_Y_demoIndexed, (-1, 1)) * X_demoIndexed
     phi_X_Y = np.sum(phi_X_Y, axis=0) / X_demoIndexed.shape[0]
@@ -412,13 +492,13 @@ class Super_human:
 
 
   def compute_grad_theta(self):
-    print(self.sample_matrix_demo_indexed)
+    #print(self.sample_matrix_demo_indexed)
     start_time = time.time()
-    print("--- %s in compute_grad_theta ---" % (time.time() - start_time))
+    #print("--- %s in compute_grad_theta ---" % (time.time() - start_time))
     self.subdom_tensor = np.zeros((self.num_of_demos, self.num_of_features)) 
     self.compute_exp_phi_X_Y() 
     grad_theta = [0.0 for _ in range(self.num_of_attributs)]
-    print("--- %s before for loop j ---" % (time.time() - start_time))
+    #print("--- %s before for loop j ---" % (time.time() - start_time))
     for j, x in enumerate(tqdm(self.demo_list)):
       if j == 0: self.subdom_constant = 0
       else: self.subdom_constant = self.get_subdom_constant()
@@ -434,25 +514,10 @@ class Super_human:
     #np.save('subdom_tensor.npy', self.subdom_tensor)
     return subdom_tensor_sum, grad_theta
 
-  # def compute_grad_alpha(self):
-  #   start_time = time.time()
-  #   print("--- %s in compute_grad_alpha ---" % (time.time() - start_time))
-  #   grad_alpha = np.zeros(self.num_of_features)
-  #   for j, x in enumerate(self.demo_list):
-  #     for k in range(self.num_of_features):
-  #       sample_loss = self.sample_loss[j, k] #self.get_sample_loss(j, k)
-  #       demo_loss = self.demo_list[j].metric[k]
-  #       if self.alpha[k]*(sample_loss - demo_loss) + 1 > 0:     # subtract constant c to optimize for useful demonstation instead of avoiding from noisy ones
-  #         grad_alpha[k] += sample_loss - demo_loss
-  #   #denum = -2*self.lamda*self.num_of_demos
-  #   grad_alpha /= -2*self.lamda*self.num_of_demos
-  #   print("--- %s end of compute_grad_alpha ---" % (time.time() - start_time))
-  #   return grad_alpha
-
   def compute_alpha(self):
     start_time = time.time()
-    print("--- %s in compute_alpha ---" % (time.time() - start_time))
-    alpha = np.zeros(self.num_of_features)
+    #print("--- %s in compute_alpha ---" % (time.time() - start_time))
+    alpha = np.ones(self.num_of_features)
   
     for k in range(self.num_of_features):
       dominated_demos = []
@@ -460,19 +525,34 @@ class Super_human:
       for j in range(self.num_of_demos):
         sample_loss = self.sample_loss[j, k]
         demo_loss = self.demo_list[j].metric[k] 
-        if sample_loss <= demo_loss:
-          alpha_candidate = 1.0/(demo_loss - sample_loss)
-          if not math.isinf(alpha_candidate):
-            dominated_demos.append((alpha_candidate, demo_loss, sample_loss))
+        #if True:#sample_loss <= demo_loss:
+        #  alpha_candidate = 1.0/(demo_loss - sample_loss)
+        #  if not math.isinf(alpha_candidate):
+        #    dominated_demos.append((alpha_candidate, demo_loss, sample_loss))
+        dominated_demos.append((demo_loss, sample_loss))
       
-      #avg_inverse_demo_loss = np.mean([1.0/x[1] for x in dominated_demos])
       dominated_demos.sort(key = lambda x: x[0]) #dominated_demos.sort(key = lambda x: x[0], reverse=True)   # sort based on demo loss
       dominated_demos = np.array(dominated_demos)
-
+      avg_sample_loss = np.mean([x[1] for x in dominated_demos])
+      # print()
+      # print(self.feature[k])
+      # print()
+      # print("demo loss:")
+      # print([x[0] for x in dominated_demos])
+      # print("avg_sample_loss:")
+      # print(avg_sample_loss)
       for m, demo in enumerate(dominated_demos):
-        if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]]): ###if (1.0/demo[2]) >= np.mean([1.0/x[1] for x in dominated_demos[0:m+1]]):
-          alpha[k] = demo[0]
+        # print("in for: ")
+        # print("m: ", m)
+        # print("sample loss:", demo[1])
+        if (demo[1]) <= np.mean([x[0] for x in dominated_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
+          # print("in if: ")
+          # print("1.0/(demo_loss - sampe_loss)", 1.0/(demo[0] - demo[1]))
+          alpha[k] = 1.0/(demo[0] - demo[1]) # 1/(y_tilde - y_hat)
           break
+    for i in range(self.num_of_features):     
+      if alpha[i] == 1:
+        alpha[i] = max(alpha)
 
     print("--- %s end of compute_alpha ---" % (time.time() - start_time))
     return alpha
@@ -482,8 +562,8 @@ class Super_human:
   def eval_model_pp(self, mode="demographic_parity"):
     train_file_path = os.path.join(self.train_data_path, "train_data.csv")
     test_file_path = os.path.join(self.test_data_path, "test_data.csv")
-    self.train_data = pd.read_csv(train_file_path, index_col=0).drop(columns=['prev_index'])
-    self.test_data = pd.read_csv(test_file_path, index_col=0).drop(columns=['prev_index'])
+    self.train_data = pd.read_csv(train_file_path, index_col=0)#.drop(columns=['prev_index'])
+    self.test_data = pd.read_csv(test_file_path, index_col=0)#.drop(columns=['prev_index'])
     A_train = self.train_data["gender"]
     A_test = self.test_data["gender"]
     A_str_train = A_train.map({ 2:"Female", 1:"Male"})
@@ -525,12 +605,19 @@ class Super_human:
 
   def eval_model(self, mode):
     if mode == "train":
-      X = self.base_dict["X_" + mode]
-      Y = self.base_dict["Y_" + mode]
-      A_str = self.base_dict["A_str_" + mode]
+      train_file_path = os.path.join(self.train_data_path, "train_data.csv")
+      self.train_data = pd.read_csv(train_file_path, index_col=0)#.drop(columns=['prev_index'])
+      A = self.train_data["gender"]
+      A_str = A.map({ 2:"Female", 1:"Male"})
+      # Extract the target
+      Y = self.train_data["label"]
+      X = self.train_data.drop(columns=['label'])
+      #X = self.base_dict["X_" + mode]
+      #Y = self.base_dict["Y_" + mode]
+      #A_str = self.base_dict["A_str_" + mode]
     elif mode == "test-sh" or mode == "test-pp":
       test_file_path = os.path.join(self.test_data_path, "test_data.csv")
-      self.test_data = pd.read_csv(test_file_path, index_col=0).drop(columns=['prev_index'])
+      self.test_data = pd.read_csv(test_file_path, index_col=0)#.drop(columns=['prev_index'])
       A = self.test_data["gender"]
       A_str = A.map({ 2:"Female", 1:"Male"})
       # Extract the target
@@ -572,6 +659,7 @@ class Super_human:
       self.sample_superhuman() # update self.sample_matrix with new samples from new theta
       self.get_samples_demo_indexed()
       self.get_sample_loss()
+      
       # get the current theta and alpha
       theta = self.get_model_thetha()
       alpha = self.get_model_alpha()
@@ -579,6 +667,9 @@ class Super_human:
       subdom_tensor_sum, grad_theta = self.compute_grad_theta() # computer gradient of loss w.r.t theta by sampling from our model
       new_theta = theta - self.lr_theta * grad_theta  # update theta using the gradinet values
       # find new alpha
+      if i == 0:
+        print("eval from first sample: ")
+        print(self.eval_model(mode = "train"))
       new_alpha = self.compute_alpha()
       # grad_alpha = self.compute_grad_alpha()
       # new_alpha = alpha - self.lr_alpha * grad_alpha
@@ -590,6 +681,8 @@ class Super_human:
       self.update_model_alpha(new_alpha)
       # eval model
       eval_i = self.eval_model(mode = "train")
+      print("eval_i:")
+      print(eval_i)
       # store some stuff
       self.grad_theta.append(grad_theta)
       subdom_tensor_sum_arr.append(subdom_tensor_sum)
@@ -652,7 +745,7 @@ class Super_human:
 lr_theta_list = [0.05] #[0.05, 0.1, 0.5, 1.0]
 lr_theta = 0.01
 lr_alpha = 0.05
-iters = 30
+iters = 10
 dataset = "Adult"
 num_of_demos = 100
 num_of_features = 5
@@ -674,12 +767,12 @@ if __name__ == "__main__":
 
   if args['task'] == 'prepare-demos':
     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = noise, noise_ratio = noise_ratio)
-    sh_obj.base_model()
+    #sh_obj.base_model()
     sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta) # this alpha is different from self.alpha
 
   elif args['task'] == 'train':
     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = noise, noise_ratio = noise_ratio)
-    #sh_obj.base_model()
+    sh_obj.base_model()
     sh_obj.read_demo_list()
     sh_obj.update_model(lr_theta, lr_alpha, iters)
 
