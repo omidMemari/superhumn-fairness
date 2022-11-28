@@ -40,8 +40,10 @@ if __name__ == "__main__":
             demo_metric_i = [demo_list[z].metric[i] for z in range(len(demo_list))]
             demo_metric_j = [demo_list[z].metric[j] for z in range(len(demo_list))]
             f1 = plt.figure()
-            x = model_params['eval_sh'].loc[feature[j]][0]
-            y = model_params['eval_sh'].loc[feature[i]][0]
+            x = model_params['eval'][-1].loc[feature[j]][0]
+            y = model_params['eval'][-1].loc[feature[i]][0]
+            x_test = model_params['eval_sh'].loc[feature[j]][0]
+            y_test = model_params['eval_sh'].loc[feature[i]][0]
             x_pp_dp = model_params['eval_pp_dp'].loc[feature[j]][0]
             y_pp_dp = model_params['eval_pp_dp'].loc[feature[i]][0]
             x_pp_eq_odds = model_params['eval_pp_eq_odds'].loc[feature[j]][0]
@@ -56,7 +58,8 @@ if __name__ == "__main__":
             plt.xlabel(feature[j])
             plt.ylabel(feature[i])
             plt.scatter(demo_metric_j, demo_metric_i, marker='*', c=[(255/255,211/255,107/255)], label = 'post_proc_demos')
-            plt.plot(x, y, 'ro', label = 'super_human')
+            plt.plot(x, y, 'ro', label = 'super_human_train')
+            plt.plot(x_test, y_test, marker='X', color='black', label = 'super_human_test')
             plt.plot(x_pp_dp, y_pp_dp, 'bo', label = 'post_proc_dp')
             plt.plot(x_pp_eq_odds, y_pp_eq_odds, 'go', label = 'post_proc_eq_odds')
             plt.plot([x, x], [y, ylim], 'r')
