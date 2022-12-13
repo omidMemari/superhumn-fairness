@@ -545,10 +545,11 @@ class Super_human:
         # print("in for: ")
         # print("m: ", m)
         # print("sample loss:", demo[1])
+        alpha[k] = 1.0/(demo[0] - demo[1])
         if (demo[1]) <= np.mean([x[0] for x in dominated_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
           # print("in if: ")
           # print("1.0/(demo_loss - sampe_loss)", 1.0/(demo[0] - demo[1]))
-          alpha[k] = 1.0/(demo[0] - demo[1]) # 1/(y_tilde - y_hat)
+          #alpha[k] = 1.0/(demo[0] - demo[1])
           break
     for i in range(self.num_of_features):     
       if alpha[i] == 1:
