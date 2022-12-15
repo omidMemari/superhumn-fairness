@@ -4,12 +4,28 @@ import pandas as pd
 from fairlearn.metrics import (
     MetricFrame,
     selection_rate, demographic_parity_difference, demographic_parity_ratio,
-    false_positive_rate, false_negative_rate,
+    false_positive_rate, false_negative_rate, true_negative_rate, true_positive_rate,
     false_positive_rate_difference, false_negative_rate_difference,
     equalized_odds_difference)
 from sklearn.metrics import balanced_accuracy_score, roc_auc_score, zero_one_loss
 
+def positive_predictive_value(y_true, y_pred):
+    """Positive predictive value (PPV) for binary classification."""
+    tp = np.sum(np.logical_and(y_true == 1, y_pred == 1))
+    fp = np.sum(np.logical_and(y_true == 0, y_pred == 1))
+    return tp / (tp + fp)
 
+def negative_predictive_value(y_true, y_pred):
+    """Negative predictive value (NPV) for binary classification."""
+    tn = np.sum(np.logical_and(y_true == 0, y_pred == 0))
+    fn = np.sum(np.logical_and(y_true == 1, y_pred == 0))
+    return tn / (tn + fn)
+
+def postive_negative_values_diff(y_true, y_pred, group):
+    # Positive and negative values
+    mpv = MetricFrame(metrics=positive_predictive_value, y_true=y_true, y_pred=y_pred, sensitive_features=group)
+    mnv = MetricFrame(metrics=negative_predictive_value, y_true=y_true, y_pred=y_pred, sensitive_features=group)
+    return mpv - mnv
 
 # Helper functions
 def get_metrics_df(models_dict, y_true, group):
