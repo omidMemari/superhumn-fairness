@@ -25,7 +25,7 @@ def postive_negative_values_diff(y_true, y_pred, group):
     # Positive and negative values
     mpv = MetricFrame(metrics=positive_predictive_value, y_true=y_true, y_pred=y_pred, sensitive_features=group)
     mnv = MetricFrame(metrics=negative_predictive_value, y_true=y_true, y_pred=y_pred, sensitive_features=group)
-    return mpv - mnv
+    return abs(mpv - mnv)
 
 # Helper functions
 def get_metrics_df(models_dict, y_true, group):
