@@ -48,7 +48,9 @@ def get_metrics_df(models_dict, y_true, group):
         "Equalized odds difference": (
             lambda x: equalized_odds_difference(y_true, x, sensitive_features=group), True),
         "ZeroOne": (
-            lambda x: zero_one_loss(y_true, x), True)
+            lambda x: zero_one_loss(y_true, x), True),
+        "postive_negative_values_diff": (
+            lambda x: postive_negative_values_diff(y_true, x, group), True)
         #"Overall AUC": (
         #    lambda x: roc_auc_score(y_true, x), False),
         #"AUC difference": (
