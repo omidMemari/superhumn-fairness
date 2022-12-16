@@ -9,23 +9,22 @@ from fairlearn.metrics import (
     equalized_odds_difference)
 from sklearn.metrics import balanced_accuracy_score, roc_auc_score, zero_one_loss
 
-def positive_predictive_value(y_true, y_pred):
-    """Positive predictive value (PPV) for binary classification."""
-    tp = np.sum(np.logical_and(y_true == 1, y_pred == 1))
-    fp = np.sum(np.logical_and(y_true == 0, y_pred == 1))
-    return tp / (tp + fp)
-
-def negative_predictive_value(y_true, y_pred):
-    """Negative predictive value (NPV) for binary classification."""
-    tn = np.sum(np.logical_and(y_true == 0, y_pred == 0))
-    fn = np.sum(np.logical_and(y_true == 1, y_pred == 0))
-    return tn / (tn + fn)
-
-def postive_negative_values_diff(y_true, y_pred, group):
-    # Positive and negative values
-    mpv = MetricFrame(metrics=positive_predictive_value, y_true=y_true, y_pred=y_pred, sensitive_features=group)
-    mnv = MetricFrame(metrics=negative_predictive_value, y_true=y_true, y_pred=y_pred, sensitive_features=group)
-    return abs(mpv - mnv)
+def positive_predictive_value(y_true, y_pred, group):
+    # PPV for every group
+    for group_value in group.unique():
+        # Get the indices for the group
+        group_indices = group == group_value
+        # Get the true positives
+        true_positives = np.logical_and(y_true[group_indices], y_pred[group_indices])
+        # Get the false positives
+        false_positives = np.logical_and(np.logical_not(y_true[group_indices]), y_pred[group_indices])
+        # Calculate the PPV
+        ppv = np.sum(true_positives) / (np.sum(true_positives) + np.sum(false_positives))
+        print(f"PPV for {group.name}={group_value}: {ppv}")
+    # get difference in PPV
+    ppv_diff = np.abs(ppv[0] - ppv[1])
+    return ppv_diff
+    
 
 # Helper functions
 def get_metrics_df(models_dict, y_true, group):
@@ -49,8 +48,8 @@ def get_metrics_df(models_dict, y_true, group):
             lambda x: equalized_odds_difference(y_true, x, sensitive_features=group), True),
         "ZeroOne": (
             lambda x: zero_one_loss(y_true, x), True),
-        "postive_negative_values_diff": (
-            lambda x: postive_negative_values_diff(y_true, x, group), True)
+        "positive_predictive_value_difference": (
+            lambda x: positive_predictive_value(y_true, x, group), True)
         #"Overall AUC": (
         #    lambda x: roc_auc_score(y_true, x), False),
         #"AUC difference": (
