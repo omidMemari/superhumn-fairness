@@ -46,12 +46,7 @@ def positive_predictive_value_helper(y_true, y_pred):
     fp = false_positives(y_true, y_pred)
     return tp / (tp + fp)
 
-def positive_predictive_value(y_true, y_pred, group):
-    #tp = np.sum(np.logical_and(y_true, y_pred))
-    #fp = np.sum(np.logical_and(np.logical_not(y_true), y_pred))
-    #return tp / (tp + fp)
-    return MetricFrame(metrics=positive_predictive_value_helper, y_true=y_true, y_pred=y_pred, sensitive_features=group).difference(method='between_groups')
-    
+
 
 # Helper functions
 def get_metrics_df(models_dict, y_true, group):
@@ -87,20 +82,3 @@ def get_metrics_df(models_dict, y_true, group):
         df_dict[metric_name] = [metric_func(preds) if use_preds else metric_func(scores) 
                                 for model_name, (preds, scores) in models_dict.items()]
     return pd.DataFrame.from_dict(df_dict, orient="index", columns=models_dict.keys())
-
-
-
-
-g = ["m", "m", "m","m", "m", "m","m", "m", "m","m", "m", "m","m", "m", "m","m", "m", "m","m", "m", "m","m", "m", "m","m", "m", "m","f","f","f","f","f","f","f","f","f","f","f","f","f","f","f","f","f","f"] #np.concatenate((np.ones(27), np.zeros(18)), axis=0)
-print(len(g))
-y_true = list(np.concatenate((np.ones(9), np.zeros(18), np.ones(9), np.zeros(9)), axis=0))
-y_pred = list(np.concatenate((np.ones(3), np.zeros(6), np.ones(3), np.zeros(15), np.ones(2), np.zeros(7), np.ones(2), np.zeros(7)), axis=0))
-
-
- 
-
-#df_g = pd.DataFrame(g, columns=['gender'])
-
-ppv = positive_predictive_value(y_true, y_pred, g)
-
-print(ppv)
