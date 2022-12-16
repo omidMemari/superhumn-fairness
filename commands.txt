@@ -1,0 +1,10 @@
+source ../sh-env/bin/activate
+
+eval `ssh-agent -s`
+ssh-add ~/.ssh/omidGit
+git add .
+git commit -m "some changes..."
+git push -u origin main
+
+python main.py -t prepare-demos -n False;python main.py -t train -n False;python main.py -t test -n False;python plot.py -n False
+python main.py -t prepare-demos -n True;python main.py -t train -n True;python main.py -t test -n True;python plot.py -n True
