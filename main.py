@@ -64,7 +64,7 @@ class Super_human:
     self.num_of_demos = num_of_demos
     #self.num_of_samples = num_of_samples
     self.num_of_features = num_of_features
-    self.feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference"}
+    self.feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference", 5: "Positive predictive value difference"}
     self.alpha = [1.0 for _ in range(self.num_of_features)]
     self.dataset_ref = pd.read_csv('dataset_ref.csv', index_col=0)
     self.num_of_attributs = self.dataset_ref.shape[1] - 1 # discard label
@@ -748,8 +748,8 @@ lr_theta = 0.01
 lr_alpha = 0.05
 iters = 10
 dataset = "Adult"
-num_of_demos = 100
-num_of_features = 5
+num_of_demos = 50
+num_of_features = 6
 alpha = 0.5
 beta = 0.5
 model = "logistic_regression"
