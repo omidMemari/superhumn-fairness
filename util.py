@@ -17,6 +17,13 @@ def true_positives(y_true, y_pred):
             tp += 1
     return tp
 
+def true_negatives(y_true, y_pred):
+    tn = 0
+    for i in range(len(y_true)):
+        if y_true[i] == 0 and y_pred[i] == 0:
+            tn += 1
+    return tn
+
 
 def false_positives(y_true, y_pred):
     fp = 0
@@ -24,6 +31,14 @@ def false_positives(y_true, y_pred):
         if y_true[i] == 0 and y_pred[i] == 1:
             fp += 1
     return fp
+
+
+def false_negatives(y_true, y_pred):
+    fn = 0
+    for i in range(len(y_true)):
+        if y_true[i] == 1 and y_pred[i] == 0:
+            fn += 1
+    return fn
 
 # backup
 # def positive_predictive_value_helper(y_true, y_pred):
@@ -37,11 +52,25 @@ def positive_predictive_value_helper(y_true, y_pred):
     fp = false_positives(y_true, y_pred)
     return tp / (tp + fp)
 
+def negative_predictive_value_helper(y_true, y_pred):
+    tn = true_negatives(y_true, y_pred)
+    fn = false_negatives(y_true, y_pred)
+    return tn / (tn + fn)
+
+def predictive_value_helper(y_true, y_pred):
+    ppv = positive_predictive_value_helper(y_true, y_pred)
+    npv = negative_predictive_value_helper(y_true, y_pred)
+    return max(ppv, npv)
+
 def positive_predictive_value(y_true, y_pred, group):
-    #tp = np.sum(np.logical_and(y_true, y_pred))
-    #fp = np.sum(np.logical_and(np.logical_not(y_true), y_pred))
-    #return tp / (tp + fp)
     return MetricFrame(metrics=positive_predictive_value_helper, y_true=y_true, y_pred=y_pred, sensitive_features=group).difference(method='between_groups')
+
+def negative_predictive_value(y_true, y_pred, group):
+    return MetricFrame(metrics=negative_predictive_value_helper, y_true=y_true, y_pred=y_pred, sensitive_features=group).difference(method='between_groups')
+
+def predictive_value(y_true, y_pred, group):
+    return MetricFrame(metrics=predictive_value_helper, y_true=y_true, y_pred=y_pred, sensitive_features=group)
+
     
 
 # Helper functions
@@ -67,7 +96,11 @@ def get_metrics_df(models_dict, y_true, group):
         "ZeroOne": (
             lambda x: zero_one_loss(y_true, x), True),
         "Positive predictive value difference": (
-            lambda x: positive_predictive_value(y_true, x, group), True)
+            lambda x: positive_predictive_value(y_true, x, group), True),
+        "Negative predictive value difference": (
+            lambda x: negative_predictive_value(y_true, x, group), True),
+        "Predictive value difference": (
+            lambda x: predictive_value(y_true, x, group), True)
         #"Overall AUC": (
         #    lambda x: roc_auc_score(y_true, x), False),
         #"AUC difference": (

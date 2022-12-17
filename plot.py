@@ -5,13 +5,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import argparse
 
-feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference", 5: "Positive predictive value difference"}
-short = {"ZeroOne": "0-1", "Demographic parity difference": "DP", "False negative rate difference": "FNR", "False positive rate difference": "FPR", "Equalized odds difference": "EqOdds", "Positive predictive value difference": "PPV"}
+feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference", 5: "Positive predictive value difference", 6: "Negative predictive value difference", 7: "Predictive value difference"}
+short = {"ZeroOne": "0-1", "Demographic parity difference": "DP", "False negative rate difference": "FNR", "False positive rate difference": "FPR", "Equalized odds difference": "EqOdds", "Positive predictive value difference": "PPV", "Negative predictive value difference":"NPV", "Predictive value difference":"PRP"}
 lr_theta = 0.01
 lr_alpha = 0.05
 dataset = "Adult"
 num_of_demos = 50#100
-num_of_features = 6
+num_of_features = 8
 #noise = True
 
 if __name__ == "__main__":
