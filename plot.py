@@ -11,7 +11,7 @@ lr_theta = 0.01
 lr_alpha = 0.05
 dataset = "Adult"
 num_of_demos = 50#100
-num_of_features = 8
+num_of_features = 4#8
 #noise = True
 
 if __name__ == "__main__":

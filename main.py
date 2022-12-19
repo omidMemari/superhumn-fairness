@@ -64,7 +64,8 @@ class Super_human:
     self.num_of_demos = num_of_demos
     #self.num_of_samples = num_of_samples
     self.num_of_features = num_of_features
-    self.feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference", 5: "Positive predictive value difference", 6: "Negative predictive value difference", 7: "Predictive value difference"}
+    #self.feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference", 5: "Positive predictive value difference", 6: "Negative predictive value difference", 7: "Predictive value difference"}
+    self.feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds difference", 3: "Predictive value difference"}
     self.alpha = [1.0 for _ in range(self.num_of_features)]
     self.dataset_ref = pd.read_csv('dataset_ref.csv', index_col=0)
     self.num_of_attributs = self.dataset_ref.shape[1] - 1 # discard label
@@ -444,9 +445,9 @@ class Super_human:
       for feature_index in range(self.num_of_features):
         self.sample_loss[demo_index, feature_index] = metric_df.loc[self.feature[feature_index]]["Super_human"] #metric[feature_index]
     
-    print("sample_loss for 0-1: ", self.sample_loss[:,0])
-    print("sample_loss for dp: ", self.sample_loss[:,1])
-    print("sample_loss for EqOdds: ", self.sample_loss[:,4])
+    #print("sample_loss for 0-1: ", self.sample_loss[:,0])
+    #print("sample_loss for dp: ", self.sample_loss[:,1])
+    #print("sample_loss for EqOdds: ", self.sample_loss[:,4])
     print("--- %s end of get_sample_loss ---" % (time.time() - start_time))
 
   def get_demo_loss(self, demo_index, feature_index):
@@ -520,7 +521,7 @@ class Super_human:
     alpha = np.ones(self.num_of_features)
   
     for k in range(self.num_of_features):
-      dominated_demos = []
+      sorted_demos = []
       alpha_candidate = []
       for j in range(self.num_of_demos):
         sample_loss = self.sample_loss[j, k]
@@ -529,11 +530,11 @@ class Super_human:
         #  alpha_candidate = 1.0/(demo_loss - sample_loss)
         #  if not math.isinf(alpha_candidate):
         #    dominated_demos.append((alpha_candidate, demo_loss, sample_loss))
-        dominated_demos.append((demo_loss, sample_loss))
+        sorted_demos.append((demo_loss, sample_loss))
       
-      dominated_demos.sort(key = lambda x: x[0]) #dominated_demos.sort(key = lambda x: x[0], reverse=True)   # sort based on demo loss
-      dominated_demos = np.array(dominated_demos)
-      avg_sample_loss = np.mean([x[1] for x in dominated_demos])
+      sorted_demos.sort(key = lambda x: x[0]) #dominated_demos.sort(key = lambda x: x[0], reverse=True)   # sort based on demo loss
+      sorted_demos = np.array(sorted_demos)
+      #avg_sample_loss = np.mean([x[1] for x in dominated_demos])
       # print()
       # print(self.feature[k])
       # print()
@@ -541,19 +542,21 @@ class Super_human:
       # print([x[0] for x in dominated_demos])
       # print("avg_sample_loss:")
       # print(avg_sample_loss)
-      for m, demo in enumerate(dominated_demos):
+      alpha[k] = np.mean(alpha) # default value in case it didn't change
+      for m, demo in enumerate(sorted_demos):
         # print("in for: ")
         # print("m: ", m)
         # print("sample loss:", demo[1])
-        alpha[k] = 1.0/(demo[0] - demo[1])
-        if (demo[1]) <= np.mean([x[0] for x in dominated_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
+        if (demo[0] > demo[1]):
+          alpha[k] = 1.0/(demo[0] - demo[1])
+        if (demo[1]) <= np.mean([x[0] for x in sorted_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
           # print("in if: ")
           # print("1.0/(demo_loss - sampe_loss)", 1.0/(demo[0] - demo[1]))
           #alpha[k] = 1.0/(demo[0] - demo[1])
           break
-    for i in range(self.num_of_features):     
-      if alpha[i] == 1:
-        alpha[i] = max(alpha)
+    # for i in range(self.num_of_features):     
+    #   if alpha[i] == 1:
+    #     alpha[i] = max(alpha)
 
     print("--- %s end of compute_alpha ---" % (time.time() - start_time))
     return alpha
@@ -746,10 +749,10 @@ class Super_human:
 lr_theta_list = [0.05] #[0.05, 0.1, 0.5, 1.0]
 lr_theta = 0.01
 lr_alpha = 0.05
-iters = 10
+iters = 30
 dataset = "Adult"
 num_of_demos = 50
-num_of_features = 8
+num_of_features = 4#8
 alpha = 0.5
 beta = 0.5
 model = "logistic_regression"
