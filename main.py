@@ -676,7 +676,7 @@ class Super_human:
 
 
 lr_theta = 0.01
-iters = 30
+iters = 20
 dataset = "Adult"
 num_of_demos = 50
 num_of_features = 4
