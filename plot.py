@@ -5,12 +5,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import argparse
 
-feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference", 5: "Positive predictive value difference", 6: "Negative predictive value difference", 7: "Predictive value difference"}
+#feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference", 5: "Positive predictive value difference", 6: "Negative predictive value difference", 7: "Predictive value difference"}
+feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds difference", 3: "Predictive value difference"}
 short = {"ZeroOne": "0-1", "Demographic parity difference": "DP", "False negative rate difference": "FNR", "False positive rate difference": "FPR", "Equalized odds difference": "EqOdds", "Positive predictive value difference": "PPV", "Negative predictive value difference":"NPV", "Predictive value difference":"PRP"}
 lr_theta = 0.01
-lr_alpha = 0.05
 dataset = "Adult"
-num_of_demos = 50#100
+num_of_demos = 50
 num_of_features = 4#8
 #noise = True
 
@@ -21,7 +21,7 @@ if __name__ == "__main__":
     args = vars(parser.parse_args())
 
     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = eval(args['noise']))
-    experiment_filename = make_experiment_filename(dataset = dataset, lr_theta = lr_theta, lr_alpha = lr_alpha, num_of_demos = num_of_demos)
+    experiment_filename = make_experiment_filename(dataset = dataset, lr_theta = lr_theta, num_of_demos = num_of_demos)
     file_dir = os.path.join(sh_obj.test_data_path)
     print("file_dir: ", file_dir)
     model_params = load_object(file_dir,experiment_filename)

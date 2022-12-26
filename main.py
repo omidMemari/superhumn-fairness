@@ -40,11 +40,11 @@ from fairlearn.metrics import (
 from sklearn.metrics import balanced_accuracy_score, roc_auc_score, zero_one_loss
 
 
-sample_record_filename_template = "{}_{}_{}_{}"
+sample_record_filename_template = "{}_{}_{}"
 
 
 def make_experiment_filename(**kwargs):
-    return sample_record_filename_template.format(kwargs['dataset'], kwargs['lr_theta'], kwargs['lr_alpha'],  kwargs['num_of_demos']).replace('.','-')
+    return sample_record_filename_template.format(kwargs['dataset'], kwargs['lr_theta'],  kwargs['num_of_demos']).replace('.','-')
 
 def store_object(obj,path, name):
     filepath = os.path.join(path,name)
@@ -59,7 +59,7 @@ def load_object(path,name):
 
 class Super_human:
 
-  def __init__(self, dataset, num_of_demos, num_of_features, lr_alpha = 0.05, lr_theta = 0.05, noise=False, noise_ratio = 0.2):
+  def __init__(self, dataset, num_of_demos, num_of_features, lr_theta = 0.05, noise=False, noise_ratio = 0.2):
     self.dataset = dataset
     self.num_of_demos = num_of_demos
     #self.num_of_samples = num_of_samples
@@ -72,7 +72,6 @@ class Super_human:
     self.lamda = 1.0
     self.c = None
     self.lr_theta = lr_theta
-    self.lr_alpha = lr_alpha
     self.noise_ratio = noise_ratio
     self.noise = noise
     self.set_paths()
@@ -343,8 +342,6 @@ class Super_human:
       metrics = self.run_logistic_pp(model = model, data_demo = new_demo)
       self.test_pp_logi[i] = metrics
       new_demo.metric_df = metrics
-      #print(new_demo.metric_df)
-      #print()
       for k in range(self.num_of_features):
         new_demo.metric[k] = new_demo.metric_df.loc[self.feature[k]]["ThresholdOptimizer"]
       #new_demo.metric = {0: new_demo.metric_df.loc['ZeroOne']["ThresholdOptimizer"], 1: new_demo.metric_df.loc['Demographic parity difference']["ThresholdOptimizer"], 2: new_demo.metric_df.loc['False negative rate difference']["ThresholdOptimizer"]}
@@ -396,15 +393,10 @@ class Super_human:
     #X = self.dataset_ref.drop(columns=['label']).to_numpy() #X = self.train_data.to_numpy()
     data_size, feature_size = self.train_data.shape
     self.sample_matrix = np.zeros((self.num_of_demos, data_size)) #np.array([[-1 for _ in range(data_size)] for _ in range(num_of_samples)]) # create a matrix of size [num_of_samples * data_set_size]. Each row is a sample from our model that predicts the label of dataset.
-    #print("--- %s in sample_superhuman ---" % (time.time() - start_time))
     for j in range(data_size):
       probs = self.get_model_pred(item = [X[j]]) #probs = self.get_model_pred(item = [self.dataset_ref.drop(columns=['label']).loc[j]])
       self.sample_matrix[:,j] = self.sample_from_prob(dist = probs, size = self.num_of_demos) # return a vector of size num_of_samples (100) with label prediction samples for j_th item of the dataset
-      
-    
-    print("sample_matrix size: ", self.sample_matrix.shape)
-    print("self.sample_matrix[:,0]", self.sample_matrix[:,0])
-    print("self.dataset_ref['label]", self.dataset_ref["label"].loc[0])
+          
     print("--- %s end of sample_superhuman ---" % (time.time() - start_time))
     return self.sample_matrix
 
@@ -413,28 +405,18 @@ class Super_human:
     sample_size = self.demo_list[0].idx_test.size
     self.sample_matrix_demo_indexed = np.zeros((self.num_of_demos, sample_size))
     
-
-    #train_file_path = os.path.join(self.train_data_path, "train_data.csv")
-    #self.train_data = pd.read_csv(train_file_path, index_col=0).drop(columns=['label'])
-    #X = self.train_data.drop(columns=['label'])
     for i in range(self.num_of_demos):
       demo = self.demo_list[i]
-      #len(demo.idx_test.merge(B)) == len(A)
-      #print("self.train_data['prev_index']: ", self.train_data['prev_index']).to_numpy())
-      #print("demo.idx_test: ", demo.idx_test.to_numpy())############################################################################################################
       self.sample_matrix_demo_indexed[i,:] = self.sample_matrix[i,:][demo.idx_test]
     return self.sample_matrix_demo_indexed
     
 
   def get_sample_loss(self):
     start_time = time.time()
-    #print("--- %s in get_sample_loss ---" % (time.time() - start_time))
     self.sample_loss = np.zeros((self.num_of_demos, self.num_of_features))
     for demo_index, x in enumerate(tqdm(self.demo_list)):
       demo = self.demo_list[demo_index]
       sample_preds = self.sample_matrix_demo_indexed[demo_index,:]
-      #print("sample_preds", sample_preds.shape)
-      #print("sample_preds: ", sample_preds)
       # Metrics
       models_dict = {"Super_human": (sample_preds, sample_preds)}
       y = self.train_data.loc[demo.idx_test]['label'] # we use true_y from original dataset since y_true in demo can be noisy (in noise setting)
@@ -445,9 +427,6 @@ class Super_human:
       for feature_index in range(self.num_of_features):
         self.sample_loss[demo_index, feature_index] = metric_df.loc[self.feature[feature_index]]["Super_human"] #metric[feature_index]
     
-    #print("sample_loss for 0-1: ", self.sample_loss[:,0])
-    #print("sample_loss for dp: ", self.sample_loss[:,1])
-    #print("sample_loss for EqOdds: ", self.sample_loss[:,4])
     print("--- %s end of get_sample_loss ---" % (time.time() - start_time))
 
   def get_demo_loss(self, demo_index, feature_index):
@@ -469,15 +448,11 @@ class Super_human:
     X = self.train_data.drop(columns=['label']) #self.dataset_ref.drop(columns=['label'])
     self.exp_phi_X_Y = [0 for _ in range(self.num_of_attributs)]
     self.phi_X_Y = []
-    #print("X: ", X.head())
-    #print("exp_phi_X_Y: ", self.exp_phi_X_Y.shape)
     for i in range(self.num_of_demos):
       demo = self.demo_list[i]
       sample_Y = self.sample_matrix_demo_indexed[i,:]
       phi_X_Y_temp = np.reshape(sample_Y, (-1, 1)) * X.loc[demo.idx_test]
       phi_X_Y_temp = np.sum(phi_X_Y_temp, axis=0) / X.shape[0]
-      #print("phi_X_Y_temp: ", np.shape(phi_X_Y_temp))
-      #print("self.exp_phi_X_Y: ", np.shape(self.exp_phi_X_Y))
       self.phi_X_Y.append(phi_X_Y_temp)
       self.exp_phi_X_Y += phi_X_Y_temp
     self.exp_phi_X_Y /= self.num_of_demos  # get the average
@@ -493,13 +468,10 @@ class Super_human:
 
 
   def compute_grad_theta(self):
-    #print(self.sample_matrix_demo_indexed)
     start_time = time.time()
-    #print("--- %s in compute_grad_theta ---" % (time.time() - start_time))
     self.subdom_tensor = np.zeros((self.num_of_demos, self.num_of_features)) 
     self.compute_exp_phi_X_Y() 
     grad_theta = [0.0 for _ in range(self.num_of_attributs)]
-    #print("--- %s before for loop j ---" % (time.time() - start_time))
     for j, x in enumerate(tqdm(self.demo_list)):
       if j == 0: self.subdom_constant = 0
       else: self.subdom_constant = self.get_subdom_constant()
@@ -517,7 +489,6 @@ class Super_human:
 
   def compute_alpha(self):
     start_time = time.time()
-    #print("--- %s in compute_alpha ---" % (time.time() - start_time))
     alpha = np.ones(self.num_of_features)
   
     for k in range(self.num_of_features):
@@ -526,37 +497,16 @@ class Super_human:
       for j in range(self.num_of_demos):
         sample_loss = self.sample_loss[j, k]
         demo_loss = self.demo_list[j].metric[k] 
-        #if True:#sample_loss <= demo_loss:
-        #  alpha_candidate = 1.0/(demo_loss - sample_loss)
-        #  if not math.isinf(alpha_candidate):
-        #    dominated_demos.append((alpha_candidate, demo_loss, sample_loss))
         sorted_demos.append((demo_loss, sample_loss))
       
       sorted_demos.sort(key = lambda x: x[0]) #dominated_demos.sort(key = lambda x: x[0], reverse=True)   # sort based on demo loss
       sorted_demos = np.array(sorted_demos)
-      #avg_sample_loss = np.mean([x[1] for x in dominated_demos])
-      # print()
-      # print(self.feature[k])
-      # print()
-      # print("demo loss:")
-      # print([x[0] for x in dominated_demos])
-      # print("avg_sample_loss:")
-      # print(avg_sample_loss)
       alpha[k] = np.mean(alpha) # default value in case it didn't change
       for m, demo in enumerate(sorted_demos):
-        # print("in for: ")
-        # print("m: ", m)
-        # print("sample loss:", demo[1])
         if (demo[0] > demo[1]):
           alpha[k] = 1.0/(demo[0] - demo[1])
         if (demo[1]) <= np.mean([x[0] for x in sorted_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
-          # print("in if: ")
-          # print("1.0/(demo_loss - sampe_loss)", 1.0/(demo[0] - demo[1]))
-          #alpha[k] = 1.0/(demo[0] - demo[1])
           break
-    # for i in range(self.num_of_features):     
-    #   if alpha[i] == 1:
-    #     alpha[i] = max(alpha)
 
     print("--- %s end of compute_alpha ---" % (time.time() - start_time))
     return alpha
@@ -616,9 +566,6 @@ class Super_human:
       # Extract the target
       Y = self.train_data["label"]
       X = self.train_data.drop(columns=['label'])
-      #X = self.base_dict["X_" + mode]
-      #Y = self.base_dict["Y_" + mode]
-      #A_str = self.base_dict["A_str_" + mode]
     elif mode == "test-sh" or mode == "test-pp":
       test_file_path = os.path.join(self.test_data_path, "test_data.csv")
       self.test_data = pd.read_csv(test_file_path, index_col=0)#.drop(columns=['prev_index'])
@@ -654,9 +601,8 @@ class Super_human:
     self.alpha = new_alpha
   
 
-  def update_model(self, lr_theta, lr_alpha, iters):
+  def update_model(self, lr_theta, iters):
     self.lr_theta = lr_theta
-    self.lr_alpha = lr_alpha
     self.grad_theta, subdom_tensor_sum_arr, eval = [], [], []
     for i in tqdm(range(iters)):
       # find sample loss and store it, we will use it for computing grad_theta and grad_alpha
@@ -675,10 +621,6 @@ class Super_human:
         print("eval from first sample: ")
         print(self.eval_model(mode = "train"))
       new_alpha = self.compute_alpha()
-      # grad_alpha = self.compute_grad_alpha()
-      # new_alpha = alpha - self.lr_alpha * grad_alpha
-      # print("grad_alpha: ", grad_alpha)
-      print("new alpha: ", new_alpha)
       #update theta
       self.update_model_theta(new_theta)
       #update alpha
@@ -691,15 +633,15 @@ class Super_human:
       self.grad_theta.append(grad_theta)
       subdom_tensor_sum_arr.append(subdom_tensor_sum)
       eval.append(eval_i)
-    model_params = {"model":self.model_obj, "theta": self.model_obj.coef_, "alpha":self.alpha, "eval": eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "lr_alpha": self.lr_alpha, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features}
-    experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, lr_alpha = self.lr_alpha, num_of_demos = self.num_of_demos) # only lr_theta!!!
+    model_params = {"model":self.model_obj, "theta": self.model_obj.coef_, "alpha":self.alpha, "eval": eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features}
+    experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos) # only lr_theta!!!
     file_dir = os.path.join(self.train_data_path)
     store_object(model_params, file_dir, experiment_filename)
     #np.save('eval_model.npy', eval)
     #np.save('subdom_value-'+self.learning_rate+'.npy', subdom_tensor_sum_arr)
 
   def read_model_from_file(self):
-    experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, lr_alpha = self.lr_alpha, num_of_demos = self.num_of_demos)
+    experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos)
     file_dir = os.path.join(self.train_data_path)
     self.model_params = load_object(file_dir,experiment_filename)
     self.model_obj = self.model_params["model"]
@@ -712,21 +654,8 @@ class Super_human:
         self.Y_test = self.base_dict["Y_test"]
         self.A_str_test = self.base_dict["A_str_test"]
         self.logi_params = self.base_dict["logi_params"]
-        #self.model_obj = self.base_dict["model_obj"]
-        #self.pred_scores = self.base_dict["pred_scores"]
     except Exception:
       self.base_model()
-
-    
-
-    
-    # try:
-    #   with open('model-pp.pickle', 'wb') as handle:
-    #     self.postprocess_est = pickle.load(handle)
-    #     print("self.postprocess_est: ", self.postprocess_est)
-    # except:
-    #   print("No post-processing model saved!")
-    
 
 
   def test_model(self):
@@ -740,24 +669,21 @@ class Super_human:
     self.model_params["eval_sh"]= eval_sh
     self.model_params["eval_pp_dp"]= eval_pp_dp
     self.model_params["eval_pp_eq_odds"] = eval_pp_eq_odds
-    experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, lr_alpha = self.lr_alpha, num_of_demos = self.num_of_demos)
+    experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos)
     file_dir = os.path.join(self.test_data_path)
     store_object(self.model_params, file_dir, experiment_filename)
 
 
 
-lr_theta_list = [0.05] #[0.05, 0.1, 0.5, 1.0]
 lr_theta = 0.01
-lr_alpha = 0.05
 iters = 30
 dataset = "Adult"
 num_of_demos = 50
-num_of_features = 4#8
+num_of_features = 4
 alpha = 0.5
 beta = 0.5
 model = "logistic_regression"
 noise_ratio = 0.2
-#noise = False
 
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Description of your program')
@@ -778,10 +704,10 @@ if __name__ == "__main__":
     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = noise, noise_ratio = noise_ratio)
     sh_obj.base_model()
     sh_obj.read_demo_list()
-    sh_obj.update_model(lr_theta, lr_alpha, iters)
+    sh_obj.update_model(lr_theta, iters)
 
   elif args['task'] == 'test':
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_alpha = lr_alpha, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
     #sh_obj.base_model()
     sh_obj.read_model_from_file()
     sh_obj.test_model()

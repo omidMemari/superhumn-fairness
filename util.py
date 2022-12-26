@@ -69,48 +69,16 @@ def negative_predictive_value(y_true, y_pred, group):
     return MetricFrame(metrics=negative_predictive_value_helper, y_true=y_true, y_pred=y_pred, sensitive_features=group).difference(method='between_groups')
 
 def predictive_value(y_true, y_pred, group) -> float:
-    #return MetricFrame(metrics=predictive_value_helper, y_true=y_true, y_pred=y_pred, sensitive_features=group)
     fns = {"ppv": positive_predictive_value_helper, "npv": negative_predictive_value_helper}
-    #sw_dict = {"sample_weight": None}
-    #sp = {"tpr": sw_dict, "fpr": sw_dict}
     prp = MetricFrame(
         metrics=fns,
         y_true=y_true,
         y_pred=y_pred,
         sensitive_features=group,
     )
-    # print("prp:  ", prp)
-    # print("prp.diff:   ", prp.difference(method="between_groups"))
-    # print("max(prp.diff):   ", max(prp.difference(method="between_groups")))
 
     return max(prp.difference(method="between_groups"))
 
-
-# def _get_eo_frame(y_true, y_pred, sensitive_features, sample_weight) -> MetricFrame:
-#     fns = {"tpr": true_positive_rate, "fpr": false_positive_rate}
-#     sw_dict = {"sample_weight": sample_weight}
-#     sp = {"tpr": sw_dict, "fpr": sw_dict}
-#     eo = MetricFrame(
-#         metrics=fns,
-#         y_true=y_true,
-#         y_pred=y_pred,
-#         sensitive_features=sensitive_features,
-#         sample_params=sp,
-#     )
-#     return eo 
-
-# def equalized_odds_difference(
-#     y_true, y_pred, *, sensitive_features, method="between_groups", sample_weight=None
-# ) -> float:
-#     """Calculate the equalized odds difference.
-#     The greater of two metrics: `true_positive_rate_difference` and
-#     `false_positive_rate_difference`. The former is the difference between the
-#     largest and smallest of :math:`P[h(X)=1 | A=a, Y=1]`, across all values :math:`a`
-#     of the sensitive feature(s). The latter is defined similarly, but for
-#     :math:`P[h(X)=1 | A=a, Y=0]`."""
-#     eo = _get_eo_frame(y_true, y_pred, sensitive_features, sample_weight)
-
-#     return max(eo.difference(method=method))
 
 # Helper functions
 def get_metrics_df(models_dict, y_true, group):
@@ -126,18 +94,18 @@ def get_metrics_df(models_dict, y_true, group):
         #    lambda x: 1-balanced_accuracy_score(y_true, x), True),
         #"Balanced error rate difference": (
         #    lambda x: MetricFrame(metrics=balanced_accuracy_score, y_true=y_true, y_pred=x, sensitive_features=group).difference(method='between_groups'), True),
-        "False positive rate difference": (
-            lambda x: false_positive_rate_difference(y_true, x, sensitive_features=group), True),
-        "False negative rate difference": (
-            lambda x: false_negative_rate_difference(y_true, x, sensitive_features=group), True),
+        # "False positive rate difference": (
+        #     lambda x: false_positive_rate_difference(y_true, x, sensitive_features=group), True),
+        # "False negative rate difference": (
+        #     lambda x: false_negative_rate_difference(y_true, x, sensitive_features=group), True),
         "Equalized odds difference": (
             lambda x: equalized_odds_difference(y_true, x, sensitive_features=group), True),
         "ZeroOne": (
             lambda x: zero_one_loss(y_true, x), True),
-        "Positive predictive value difference": (
-            lambda x: positive_predictive_value(y_true, x, group), True),
-        "Negative predictive value difference": (
-            lambda x: negative_predictive_value(y_true, x, group), True),
+        # "Positive predictive value difference": (
+        #     lambda x: positive_predictive_value(y_true, x, group), True),
+        # "Negative predictive value difference": (
+        #     lambda x: negative_predictive_value(y_true, x, group), True),
         "Predictive value difference": (
             lambda x: predictive_value(y_true, x, group), True)
         #"Overall AUC": (
@@ -151,14 +119,3 @@ def get_metrics_df(models_dict, y_true, group):
                                 for model_name, (preds, scores) in models_dict.items()]
     return pd.DataFrame.from_dict(df_dict, orient="index", columns=models_dict.keys())
 
-
-
-
-# g = ["m", "m", "m","m", "m", "m","m", "m", "m","m", "m", "m","m", "m", "m","m", "m", "m","m", "m", "m","m", "m", "m","m", "m", "m","f","f","f","f","f","f","f","f","f","f","f","f","f","f","f","f","f","f"] #np.concatenate((np.ones(27), np.zeros(18)), axis=0)
-# print(len(g))
-# y_true = list(np.concatenate((np.ones(9), np.zeros(18), np.ones(9), np.zeros(9)), axis=0))
-# y_pred = list(np.concatenate((np.ones(3), np.zeros(6), np.ones(3), np.zeros(15), np.ones(2), np.zeros(7), np.ones(2), np.zeros(7)), axis=0))
-
-# ppv = positive_predictive_value(y_true, y_pred, g)
-
-# print(ppv)
