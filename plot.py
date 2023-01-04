@@ -14,6 +14,21 @@ num_of_demos = 50
 num_of_features = 4#8
 #noise = True
 
+def find_gamma_superhuman(demo_list, model_params):
+    for i in range(num_of_features):
+        demo_loss = [demo_list[z].metric[i] for z in range(len(demo_list))]
+        model_loss = model_params['eval'][-1].loc[feature[i]][0]
+        f = feature[i]
+        n = len(demo_loss)
+        count = 0
+        for j in range(n):
+            if model_loss <= demo_loss[j]:
+                count += 1
+        gamma_superhuman = count/n
+        print(f, gamma_superhuman)
+
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Description of your program')
     #parser.add_argument('-t','--task', help='enter the task to do', required=True)
@@ -34,6 +49,7 @@ if __name__ == "__main__":
     ### TO DO: 1) add legends to the plots
     ###        2) add solid and dashed lines
     ### feature j is on the y axis and i is on the x axis
+    find_gamma_superhuman(demo_list, model_params) 
 
     for i in range(num_of_features):
         for j in range(i+1, num_of_features):

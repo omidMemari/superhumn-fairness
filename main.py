@@ -67,14 +67,14 @@ class Super_human:
     #self.feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference", 5: "Positive predictive value difference", 6: "Negative predictive value difference", 7: "Predictive value difference"}
     self.feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds difference", 3: "Predictive value difference"}
     self.alpha = [1.0 for _ in range(self.num_of_features)]
-    self.dataset_ref = pd.read_csv('dataset_ref.csv', index_col=0)
-    self.num_of_attributs = self.dataset_ref.shape[1] - 1 # discard label
     self.lamda = 1.0
     self.c = None
     self.lr_theta = lr_theta
     self.noise_ratio = noise_ratio
     self.noise = noise
     self.set_paths()
+    self.dataset_ref = pd.read_csv(self.dataset_path, index_col=0) #self.dataset_ref = pd.read_csv('dataset_ref.csv', index_col=0)
+    self.num_of_attributs = self.dataset_ref.shape[1] - 1 # discard label
     """
     try:
       with open('base_model.pickle', 'rb') as handle:
@@ -111,6 +111,7 @@ class Super_human:
     self.train_data_path = os.path.join(root, "train")
     self.test_data_path = os.path.join(root, "test")
     self.plots_path = os.path.join(root,"plots")
+    self.dataset_path = os.path.join("dataset", self.dataset, "dataset_ref.csv")
 
   def base_model(self):
     
@@ -283,7 +284,7 @@ class Super_human:
     return new_demo
 
   def prepare_test_pp(self, model = "logistic_regression", alpha = 0.5, beta = 0.5):
-    self.dataset_ref = pd.read_csv('dataset_ref.csv', index_col=0)
+    self.dataset_ref = pd.read_csv(self.dataset_path, index_col=0) #self.dataset_ref = pd.read_csv('dataset_ref.csv', index_col=0)
     dataset_ref = self.dataset_ref.copy(deep=True)
     #self.test_pp_logi = pd.DataFrame(index = ['Demographic parity difference', 'False negative rate difference', 'ZeroOne'])
     self.test_pp_logi = pd.DataFrame(index = [self.feature[i] for i in range(self.num_of_features)])
@@ -676,7 +677,7 @@ class Super_human:
 
 
 lr_theta = 0.01
-iters = 20
+iters = 30
 dataset = "Adult"
 num_of_demos = 50
 num_of_features = 4
