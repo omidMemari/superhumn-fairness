@@ -9,9 +9,9 @@ import argparse
 feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds difference", 3: "Predictive value difference"}
 short = {"ZeroOne": "0-1", "Demographic parity difference": "DP", "False negative rate difference": "FNR", "False positive rate difference": "FPR", "Equalized odds difference": "EqOdds", "Positive predictive value difference": "PPV", "Negative predictive value difference":"NPV", "Predictive value difference":"PRP"}
 lr_theta = 0.01
-dataset = "Adult"
+#dataset = "Adult"
 num_of_demos = 50
-num_of_features = 4#8
+num_of_features = 4
 #noise = True
 
 def find_gamma_superhuman(demo_list, model_params):
@@ -33,7 +33,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Description of your program')
     #parser.add_argument('-t','--task', help='enter the task to do', required=True)
     parser.add_argument('-n','--noise', help='noisy demos used if True', default=False)
+    parser.add_argument('-dataset', '--dataset', help="dataset name", required=True)
     args = vars(parser.parse_args())
+    dataset = args['dataset']
 
     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, noise = eval(args['noise']))
     experiment_filename = make_experiment_filename(dataset = dataset, lr_theta = lr_theta, num_of_demos = num_of_demos)
@@ -99,5 +101,5 @@ if __name__ == "__main__":
             #plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left", mode="expand", borderaxespad=0, ncol=2)
             plt.legend(reversed(handles), reversed(labels),loc='best', ncol=1, fontsize="small")
             plt.title(dataset)
-            plots_path_dir = os.path.join(sh_obj.plots_path, short[feature[j]] + "_vs_"+ short[feature[i]] + ".png")
+            plots_path_dir = os.path.join(sh_obj.plots_path, short[feature[j]] + "_vs_"+ short[feature[i]] + ".pdf")
             plt.savefig(plots_path_dir)
