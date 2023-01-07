@@ -50,11 +50,13 @@ def false_negatives(y_true, y_pred):
 def positive_predictive_value_helper(y_true, y_pred):
     tp = true_positives(y_true, y_pred)
     fp = false_positives(y_true, y_pred)
+    if tp == 0 and fp == 0: return 0
     return tp / (tp + fp)
 
 def negative_predictive_value_helper(y_true, y_pred):
     tn = true_negatives(y_true, y_pred)
     fn = false_negatives(y_true, y_pred)
+    if tn == 0 and fn == 0: return 0
     return tn / (tn + fn)
 
 def predictive_value_helper(y_true, y_pred):

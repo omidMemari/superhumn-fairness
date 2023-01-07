@@ -40,6 +40,21 @@ from fairlearn.metrics import (
 from sklearn.metrics import balanced_accuracy_score, roc_auc_score, zero_one_loss
 
 
+label_dict = {'adult': 'label', 'compas':'two_year_recid'}
+protected_dict = {'adult': 'gender', 'compas':'race'}
+protected_map = {'adult': {2:"Female", 1:"Male"}, 'compas': {1:'Caucasian', 0:'African-American'}}
+lr_theta = 0.01
+iters = 30
+num_of_demos = 50
+num_of_features = 4
+alpha = 0.5
+beta = 0.5
+model = "logistic_regression"
+noise_ratio = 0.2
+
+
+
+
 sample_record_filename_template = "{}_{}_{}"
 
 
@@ -75,17 +90,6 @@ class Super_human:
     self.set_paths()
     self.dataset_ref = pd.read_csv(self.dataset_path, index_col=0) #self.dataset_ref = pd.read_csv('dataset_ref.csv', index_col=0)
     self.num_of_attributs = self.dataset_ref.shape[1] - 1 # discard label
-    """
-    try:
-      with open('base_model.pickle', 'rb') as handle:
-          self.base_dict = pickle.load(handle)
-          self.model_name = self.base_dict["model_name"]
-          self.logi_params = self.base_dict["logi_params"]
-          self.model_obj = self.base_dict["model_obj"]
-          self.pred_scores = self.base_dict["pred_scores"]
-    except Exception:
-      self.base_model()
-    """
 
   class data_demo:
     def __init__(self, train_x=None, test_x=None, train_y=None, test_y=None, train_A=None, test_A=None, train_A_str=None, test_A_str=None ,idx_train=None, idx_test=None):
@@ -123,26 +127,14 @@ class Super_human:
         'max_iter': 1000
     }
 
-    train_file_path = os.path.join(self.train_data_path, "train_data.csv")
+    train_file_path = os.path.join(self.train_data_path, f"train_data_{dataset}.csv")
     self.train_data = pd.read_csv(train_file_path, index_col=0)
-    A = self.train_data["gender"]
-    A_str = A.map({ 2:"Female", 1:"Male"})
+    A = self.train_data[sensitive_feature]
+    print("sensitive_feature: ", sensitive_feature)
+    A_str = A.map(dict_map)
     # Extract the target
-    Y = self.train_data["label"]
-    X = self.train_data.drop(columns=['label'])
-
-    #model_logi = LogisticRegression(**self.logi_params)
-    #model_logi.fit(X_train, Y_train)
-
-    
-    #self.train_data = pd.read_csv(train_file_path, index_col=0).drop(columns=['label'])
-    # Extract the sensitive feature
-    #dataset_ref = self.train_data.copy(deep=True).reset_index(drop=True)
-    #dataset_ref = self.add_noise(dataset_ref)
-    #A = dataset_ref["gender"]
-    #A_str = A.map({ 2:"Female", 1:"Male"})
-    # Extract the target
-    #Y = dataset_ref["label"]
+    Y = self.train_data[label]
+    X = self.train_data.drop(columns=[label])
     
     
     X_train, X_test, Y_train, Y_test, A_train, A_test, A_str_train, A_str_test = train_test_split(
@@ -170,7 +162,7 @@ class Super_human:
                  "A_str_train": A_str_train,
                  "A_str_test": A_str_test}
 
-    with open('base_model.pickle', 'wb') as handle:
+    with open(f'base_model_{dataset}.pickle', 'wb') as handle:
         pickle.dump(self.base_dict, handle)
 
   def run_logistic_pp(self, model = "logistic_regression", data_demo = data_demo): #df_train=None, Y_train=None, A_train=None, A_str_test=None, df_test=None,\
@@ -248,21 +240,21 @@ class Super_human:
     dataset_temp = dataset.copy(deep=True)
     # Extract the sensitive feature
     #dataset_temp.reset_index(inplace=True, drop=True)
-    A = dataset_temp["gender"]
-    A_str = A.map({ 2:"Female", 1:"Male"})
+    A = dataset_temp[sensitive_feature]
+    A_str = A.map(dict_map)
     # Extract the target
-    Y = dataset_temp["label"]
+    Y = dataset_temp[label]
     
     ####################################
     if mode == "post-processing":
-      dataset_temp.drop(columns=['gender'])
+      dataset_temp.drop(columns=[sensitive_feature])
       if 'prev_index' in dataset_temp.columns:
         idx = dataset_temp["prev_index"]
         dataset_temp = dataset_temp.drop(columns=['prev_index'])
     elif mode == "normal":
       idx = dataset_temp.index.tolist()
     ###################################
-    X = dataset_temp.drop(columns=['label'])
+    X = dataset_temp.drop(columns=[label])
     #idx = dataset_temp["index"]
     
     # TRAIN TEST SPLIT
@@ -286,6 +278,10 @@ class Super_human:
   def prepare_test_pp(self, model = "logistic_regression", alpha = 0.5, beta = 0.5):
     self.dataset_ref = pd.read_csv(self.dataset_path, index_col=0) #self.dataset_ref = pd.read_csv('dataset_ref.csv', index_col=0)
     dataset_ref = self.dataset_ref.copy(deep=True)
+    # convert dataset_ref[senitive_feature] to int
+    dataset_ref[sensitive_feature] = dataset_ref[sensitive_feature].astype(int)
+    
+    
     #self.test_pp_logi = pd.DataFrame(index = ['Demographic parity difference', 'False negative rate difference', 'ZeroOne'])
     self.test_pp_logi = pd.DataFrame(index = [self.feature[i] for i in range(self.num_of_features)])
     self.demo_list = []
@@ -293,11 +289,12 @@ class Super_human:
     #index_list = dataset_ref.index.tolist()
     dataset_ref = shuffle(dataset_ref, random_state=r)
     ####################################
-    A = dataset_ref["gender"]
-    A_str = A.map({ 2:"Female", 1:"Male"})
-    Y = dataset_ref["label"]
+    A = dataset_ref[sensitive_feature]
+    A_str = A.map(dict_map)
+    Y = dataset_ref[label]
     idx = dataset_ref.index.tolist()
-    X = dataset_ref.drop(columns=['label'])
+    X = dataset_ref.drop(columns=[label])
+    
     df_train, df_test, Y_train, Y_test, A_train, A_test, A_str_train, A_str_test, idx_train, idx_test = train_test_split(
         X,
         Y,
@@ -308,24 +305,19 @@ class Super_human:
         random_state=12345,
         stratify=Y
         )
-
     dataset_pp = dataset_ref.loc[idx_train].reset_index(drop=True) # use only pp portion of the data and leave SH Test portion
     dataset_sh = dataset_ref.loc[idx_test].reset_index(drop=True)
-    train_file_path = os.path.join(self.train_data_path, "train_data.csv")
-    test_file_path = os.path.join(self.test_data_path, "test_data.csv")
+    
+    train_file_path = os.path.join(self.train_data_path, f"train_data_{dataset}.csv")
+    test_file_path = os.path.join(self.test_data_path, f"test_data_{dataset}.csv")
+    
+
     dataset_pp.to_csv(train_file_path)
     dataset_sh.to_csv(test_file_path)
+    
     dataset_pp_copy = dataset_pp.copy(deep=True)
-    """
-    sh_demo = self.split_data(model, alpha=alpha, dataset=dataset_ref, mode="normal") # To get the Test data for SuperHuman approach evaluation we split data once and store the test data for evaluation: (1-alpha)% for TEST SH
-    dataset_pp = dataset_ref.loc[sh_demo.idx_train].reset_index(drop=True) # use only pp portion of the data and leave SH Test portion
-    dataset_sh = dataset_ref.loc[sh_demo.idx_test].reset_index(drop=True)
-    train_file_path = os.path.join(self.train_data_path, "train_data.csv")
-    test_file_path = os.path.join(self.test_data_path, "test_data.csv")
-    dataset_pp.to_csv(train_file_path)
-    dataset_sh.to_csv(test_file_path)
-    dataset_pp_copy = dataset_pp.copy(deep=True)
-    """
+   
+    
     for i in range(self.num_of_demos):
       r = random.randint(0, 10000000)
       #dataset_temp = shuffle(dataset_pp, random_state = r)
@@ -350,17 +342,17 @@ class Super_human:
       print(i)
 
     file_dir = os.path.join(self.data_path)
-    store_object(self.demo_list, file_dir, 'demo_list')
+    store_object(self.demo_list, file_dir, f'demo_list_{dataset}')
     #with open('demo_list.pickle', 'wb') as handle:
     #    pickle.dump(self.demo_list, handle)
 
   def add_noise(self, dataset):
-    Y = dataset["label"].to_numpy()
+    Y = dataset[label].to_numpy()
     n = len(Y)
     noisy_Y = copy.deepcopy(Y)
     idx = np.random.permutation(range(len(Y)))[:int(self.noise_ratio*n)]
     noisy_Y[idx] = 1-Y[idx]
-    dataset["label"] = noisy_Y
+    dataset[label] = noisy_Y
     return dataset
   
   
@@ -370,7 +362,7 @@ class Super_human:
   def read_demo_list(self):
     file_dir = os.path.join(self.data_path)
     print("file_dir in read_demo_list: ", file_dir)
-    self.demo_list = load_object(file_dir, 'demo_list')
+    self.demo_list = load_object(file_dir, f'demo_list_{self.dataset}')
     #with open('demo_list.pickle', 'rb') as handle:
     #  self.demo_list = pickle.load(handle)
     return self.demo_list
@@ -387,9 +379,9 @@ class Super_human:
 
   def sample_superhuman(self):
     start_time = time.time()
-    train_file_path = os.path.join(self.train_data_path, "train_data.csv")
+    train_file_path = os.path.join(self.train_data_path, f"train_data_{dataset}.csv")
     self.train_data = pd.read_csv(train_file_path, index_col=0)
-    X = self.train_data.drop(columns=['label']).to_numpy()
+    X = self.train_data.drop(columns=[label]).to_numpy()
 
     #X = self.dataset_ref.drop(columns=['label']).to_numpy() #X = self.train_data.to_numpy()
     data_size, feature_size = self.train_data.shape
@@ -420,10 +412,9 @@ class Super_human:
       sample_preds = self.sample_matrix_demo_indexed[demo_index,:]
       # Metrics
       models_dict = {"Super_human": (sample_preds, sample_preds)}
-      y = self.train_data.loc[demo.idx_test]['label'] # we use true_y from original dataset since y_true in demo can be noisy (in noise setting)
-      A = self.train_data.loc[demo.idx_test]["gender"]
-      A_str = A.map({ 2:"Female", 1:"Male"})
-      
+      y = self.train_data.loc[demo.idx_test][label] # we use true_y from original dataset since y_true in demo can be noisy (in noise setting)
+      A = self.train_data.loc[demo.idx_test][sensitive_feature]
+      A_str = A.map(dict_map)
       metric_df = get_metrics_df(models_dict = models_dict, y_true = y, group = A_str) #### takes so much time!!! #metric_df = get_metrics_df(models_dict = models_dict, y_true = demo.test_y, group = demo.test_A_str)
       for feature_index in range(self.num_of_features):
         self.sample_loss[demo_index, feature_index] = metric_df.loc[self.feature[feature_index]]["Super_human"] #metric[feature_index]
@@ -444,9 +435,9 @@ class Super_human:
     return self.subdom_tensor
 
   def compute_exp_phi_X_Y(self):
-    train_file_path = os.path.join(self.train_data_path, "train_data.csv")
+    train_file_path = os.path.join(self.train_data_path, f"train_data_{dataset}.csv")
     self.train_data = pd.read_csv(train_file_path, index_col=0)
-    X = self.train_data.drop(columns=['label']) #self.dataset_ref.drop(columns=['label'])
+    X = self.train_data.drop(columns=[label]) #self.dataset_ref.drop(columns=['label'])
     self.exp_phi_X_Y = [0 for _ in range(self.num_of_attributs)]
     self.phi_X_Y = []
     for i in range(self.num_of_demos):
@@ -460,7 +451,7 @@ class Super_human:
 
   def feature_matching(self, demo_index):
     demo = self.demo_list[demo_index]
-    X_demoIndexed = self.train_data.drop(columns=['label']).loc[demo.idx_test] #self.dataset_ref.drop(columns=['label']).loc[demo.idx_test]
+    X_demoIndexed = self.train_data.drop(columns=[label]).loc[demo.idx_test] #self.dataset_ref.drop(columns=['label']).loc[demo.idx_test]
     sample_Y_demoIndexed = self.sample_matrix_demo_indexed[demo_index,:]#[demo.idx_test]
     phi_X_Y = np.reshape(sample_Y_demoIndexed, (-1, 1)) * X_demoIndexed
     phi_X_Y = np.sum(phi_X_Y, axis=0) / X_demoIndexed.shape[0]
@@ -515,19 +506,19 @@ class Super_human:
 
 
   def eval_model_pp(self, mode="demographic_parity"):
-    train_file_path = os.path.join(self.train_data_path, "train_data.csv")
-    test_file_path = os.path.join(self.test_data_path, "test_data.csv")
+    train_file_path = os.path.join(self.train_data_path, f"train_data_{dataset}.csv")
+    test_file_path = os.path.join(self.test_data_path, f"test_data_{dataset}.csv")
     self.train_data = pd.read_csv(train_file_path, index_col=0)#.drop(columns=['prev_index'])
     self.test_data = pd.read_csv(test_file_path, index_col=0)#.drop(columns=['prev_index'])
-    A_train = self.train_data["gender"]
-    A_test = self.test_data["gender"]
-    A_str_train = A_train.map({ 2:"Female", 1:"Male"})
-    A_str_test = A_test.map({ 2:"Female", 1:"Male"})
+    A_train = self.train_data[sensitive_feature]
+    A_test = self.test_data[sensitive_feature]
+    A_str_train = A_train.map(dict_map)
+    A_str_test = A_test.map(dict_map)
     # Extract the target
-    Y_train = self.train_data["label"]
-    Y_test = self.test_data["label"]
-    X_train = self.train_data.drop(columns=['label'])
-    X_test = self.test_data.drop(columns=['label'])
+    Y_train = self.train_data[label]
+    Y_test = self.test_data[label]
+    X_train = self.train_data.drop(columns=[label])
+    X_test = self.test_data.drop(columns=[label])
 
     model_logi = LogisticRegression(**self.logi_params)
     model_logi.fit(X_train, Y_train)
@@ -560,21 +551,21 @@ class Super_human:
 
   def eval_model(self, mode):
     if mode == "train":
-      train_file_path = os.path.join(self.train_data_path, "train_data.csv")
+      train_file_path = os.path.join(self.train_data_path, f"train_data_{dataset}.csv")
       self.train_data = pd.read_csv(train_file_path, index_col=0)#.drop(columns=['prev_index'])
-      A = self.train_data["gender"]
-      A_str = A.map({ 2:"Female", 1:"Male"})
+      A = self.train_data[sensitive_feature]
+      A_str = A.map(dict_map)
       # Extract the target
-      Y = self.train_data["label"]
-      X = self.train_data.drop(columns=['label'])
+      Y = self.train_data[label]
+      X = self.train_data.drop(columns=[label])
     elif mode == "test-sh" or mode == "test-pp":
-      test_file_path = os.path.join(self.test_data_path, "test_data.csv")
+      test_file_path = os.path.join(self.test_data_path, f"test_data_{dataset}.csv")
       self.test_data = pd.read_csv(test_file_path, index_col=0)#.drop(columns=['prev_index'])
-      A = self.test_data["gender"]
-      A_str = A.map({ 2:"Female", 1:"Male"})
+      A = self.test_data[sensitive_feature]
+      A_str = A.map(dict_map)
       # Extract the target
-      Y = self.test_data["label"]
-      X = self.test_data.drop(columns=['label'])
+      Y = self.test_data[label]
+      X = self.test_data.drop(columns=[label])
 
     # Scores on train set
     scores = self.model_obj.predict_proba(X)[:, 1]
@@ -649,7 +640,7 @@ class Super_human:
     self.theta = self.model_params["theta"]
     self.train_eval = self.model_params["eval"]
     try:
-      with open('base_model.pickle', 'rb') as handle:  # Be careful of which base_model you are reading!! We need to read base model corresponding to the training data
+      with open(f'base_model_{dataset}.pickle', 'rb') as handle:  # Be careful of which base_model you are reading!! We need to read base model corresponding to the training data
         self.base_dict = pickle.load(handle)
         self.X_test = self.base_dict["X_test"]
         self.Y_test = self.base_dict["Y_test"]
@@ -675,24 +666,23 @@ class Super_human:
     store_object(self.model_params, file_dir, experiment_filename)
 
 
-
-lr_theta = 0.01
-iters = 30
-dataset = "Adult"
-num_of_demos = 50
-num_of_features = 4
-alpha = 0.5
-beta = 0.5
-model = "logistic_regression"
-noise_ratio = 0.2
-
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Description of your program')
   parser.add_argument('-t','--task', help='enter the task to do', required=True)
   parser.add_argument('-n','--noise', help='noisy demos used if True', default=False)
+  parser.add_argument('-dataset', '--dataset', help="dataset name", required=True)
+  
   args = vars(parser.parse_args())
-
+  
+  dataset = args['dataset'] ##
+  label = label_dict[dataset] ##
+  sensitive_feature = protected_dict[dataset] ##
+  dict_map = protected_map[dataset] ##
   noise = eval(args['noise'])
+  print("dataset: ", dataset)
+  print("label: ", label)
+  print("sensitive feature: ", sensitive_feature)
+  print("dict_map: ", dict_map)
   print("noise: ", noise)
   print("noise type: ", type(noise))
 
