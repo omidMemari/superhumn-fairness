@@ -1,6 +1,6 @@
-experiments/data/demo_list
-experiments/noise/data/demo_list
-experiments/data/demo_list_adult
-experiments/noise/data/demo_list_adult
-experiments/data/demo_list_compas
-experiments/noise/data/demo_list_compas
+experiments/data/*
+experiments/noise/data/*
+experiments/train/*
+experiments/noise/train/*
+experiments/test/*
+experiments/noise/test/*
