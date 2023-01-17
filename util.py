@@ -180,10 +180,19 @@ def get_metrics_df(models_dict, y_true, group):
     # print("y_true: ")
     # print(y_true)
     metrics_dict = {
-        #"Overall selection rate": (
-        #    lambda x: selection_rate(y_true, x), True),
+
+         "ZeroOne": (
+            lambda x: zero_one_loss(y_true, x), True),
         "Demographic parity difference": (
             lambda x: demographic_parity_difference(y_true, x, sensitive_features=group), True), #dp_difference(y_true, x, group), True),
+        "Equalized odds difference": (
+            lambda x: equalized_odds_difference(y_true, x, sensitive_features=group), True),
+        "Predictive value difference": (
+            lambda x: predictive_value(y_true, x, group), True)
+        #"Overall selection rate": (
+        #    lambda x: selection_rate(y_true, x), True),
+
+        
         #"Demographic parity ratio": (
         #    lambda x: demographic_parity_ratio(y_true, x, sensitive_features=group), True),
         #"Overall balanced error rate": (
@@ -194,16 +203,11 @@ def get_metrics_df(models_dict, y_true, group):
         #     lambda x: false_positive_rate_difference(y_true, x, sensitive_features=group), True),
         # "False negative rate difference": (
         #     lambda x: false_negative_rate_difference(y_true, x, sensitive_features=group), True),
-        "Equalized odds difference": (
-            lambda x: equalized_odds_difference(y_true, x, sensitive_features=group), True),
-        "ZeroOne": (
-            lambda x: zero_one_loss(y_true, x), True),
+        
         # "Positive predictive value difference": (
         #     lambda x: positive_predictive_value(y_true, x, group), True),
         # "Negative predictive value difference": (
         #     lambda x: negative_predictive_value(y_true, x, group), True),
-        "Predictive value difference": (
-            lambda x: predictive_value(y_true, x, group), True)
         #"Overall AUC": (
         #    lambda x: 1.0 - roc_auc_score(y_true, x), False),
         #"AUC difference": (
