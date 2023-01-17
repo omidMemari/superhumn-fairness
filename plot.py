@@ -7,21 +7,21 @@ import argparse
 import numpy as np
 
 
-method_label =  {'zehlike':'DELTR', 'policy_learning': 'Fair-PGRank', 'post_processing':'Post_Proc', 'fair_robust': 'Fair_Robust', 'random_ranker': 'Random_Ranker'}
-markers = {0:">", 1: "*", 2: "<", 3:"v", 4:"o"}
+#method_label =  {'zehlike':'DELTR', 'policy_learning': 'Fair-PGRank', 'post_processing':'Post_Proc', 'fair_robust': 'Fair_Robust', 'random_ranker': 'Random_Ranker'}
+markers = {0:"o", 1: "*", 2: "x", 3:"<", 4:"v"}
 colors = {0:'orange', 1: 'red', 2: 'blue', 3:'green', 4:'black'}
 
 #feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference", 5: "Positive predictive value difference", 6: "Negative predictive value difference", 7: "Predictive value difference"}
 feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds difference", 3: "Predictive value difference"}
 name = {0: "Prediction error", 1: "D.DP", 2: "D.EqOdds", 3: "D.PRP"}
 short = {"ZeroOne": "error", "Demographic parity difference": "DP", "D.FNR": "FNR", "D.FPR": "FPR", "Equalized odds difference": "EqOdds", "D.PPV": "PPV", "D.NPV":"NPV", "Predictive value difference":"PRP"}
-lr_theta = 0.01
+lr_theta = 0.03
 num_of_demos = 50
 num_of_features = 4
-noise_ratio = 0
-noise_list = [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20]#[0.11, 0.12, 0.13, 0.14, 0.15]#[0.05, 0.06, 0.07, 0.08, 0.09, 0.10]#[0.0, 0.01, 0.02, 0.03, 0.04]
+noise_ratio = 0.2
+noise_list = [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.10]#, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20]
 
-def plot_features(noise, dataset):
+def plot_features(noise, dataset, noise_ratio):
 
     if noise==False: noise_ratio = 0.0
 
@@ -91,7 +91,8 @@ def plot_features(noise, dataset):
             #plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left", mode="expand", borderaxespad=0, ncol=2)
             plt.legend(reversed(handles), reversed(labels),loc='best', ncol=1, fontsize="small")
             plt.title(dataset)
-            plots_path_dir = os.path.join(sh_obj.plots_path, short[feature[j]] + "_vs_"+ short[feature[i]] + ".png")
+            plot_file_name = short[feature[j]] + "_vs_" + short[feature[i]] + "_{}_{}".format(dataset, noise_ratio).replace('.','-') + ".pdf"
+            plots_path_dir = os.path.join(sh_obj.plots_path, plot_file_name) # short[feature[j]] + "_vs_"+ short[feature[i]] + ".png")
             plt.savefig(plots_path_dir)
 
 
@@ -119,27 +120,21 @@ def plot_noise_test(dataset):
 
     ### Plotting ###
     f1 = plt.figure()
-    plt.xlabel('noise ratio') #plt.xlabel(feature[j])
-    plt.ylabel('gamma superhumn') #plt.ylabel(feature[i])
-    
+    plt.xlabel('Noise Ratio')
+    plt.ylabel(r'$\gamma$-Superhumn')
+    overlapping = {0: 0.8, 1:0.7, 2:0.4, 3:0.4}
+    line_width = {0: 5, 1: 4, 2: 3, 3: 3}
     for i in range(num_of_features):  
-        plt.scatter(noise_list, feature_gamma[i], marker=markers[i], c=colors[i], label = feature[i])
+        plt.plot(noise_list, feature_gamma[i], marker=markers[i], c=colors[i], label = feature[i], alpha=overlapping[i], lw=line_width[i])
     
     handles, labels = plt.gca().get_legend_handles_labels()
     plt.grid(True)
     plt.legend(reversed(handles), reversed(labels),loc='best', ncol=1, fontsize="small")
     plt.title(dataset)
-    plots_path_dir = os.path.join(sh_obj.plots_path, "noise_vs_gamma_superhuman_" + dataset + ".png")
+    plots_path_dir = os.path.join(sh_obj.plots_path, "noise_vs_gamma_superhuman_" + dataset + ".pdf")
     plt.savefig(plots_path_dir)
 
 
-
-
-        
-
-
-
-      
 
 
 
@@ -153,7 +148,7 @@ if __name__ == "__main__":
     noise = eval(args['noise'])
 
     if args['task'] == 'normal':
-        plot_features(noise, dataset)
+        plot_features(noise, dataset, noise_ratio)
 
     elif args['task'] == 'noise-test':
         plot_noise_test(dataset)
