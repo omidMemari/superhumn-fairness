@@ -39,32 +39,35 @@ from fairlearn.metrics import (
     equalized_odds_difference)
 from sklearn.metrics import balanced_accuracy_score, roc_auc_score, zero_one_loss
 
+from fair_logloss.fair_logloss import DP_fair_logloss_classifier, EOPP_fair_logloss_classifier, EODD_fair_logloss_classifier
+
 #feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference", 5: "Positive predictive value difference", 6: "Negative predictive value difference", 7: "Predictive value difference"}
 feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds difference", 3: "Predictive value difference"}
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}}
-lr_theta = 0.03
-iters = 20
+lr_theta = 0.001
+iters = 90
 num_of_demos = 50
 num_of_features = 4
 alpha = 0.5
 beta = 0.5
 lamda = 0.01
+demo_baseline = "fair_logloss"
 model = "logistic_regression"
-noise_ratio = 0.2
-noise_list = [0.0, 0.01, 0.02, 0.03, 0.04]#[0.16, 0.17, 0.18, 0.19, 0.20]#[0.11, 0.12, 0.13, 0.14, 0.15]#[0.05, 0.06, 0.07, 0.08, 0.09, 0.10]#
+noise_ratio = 0.09
+noise_list = [0.02]#0.03, 0.04]#[0.06, 0.07, 0.08, 0.09]##[0.16, 0.17, 0.18, 0.19, 0.20]#[0.11, 0.12, 0.13, 0.14, 0.15]#########
 
 
 
-sample_record_filename_template = "{}_{}_{}_{}"
+sample_record_filename_template = "{}_{}_{}_{}_{}"
 
 
 def make_experiment_filename(**kwargs):
-    return sample_record_filename_template.format(kwargs['dataset'], kwargs['lr_theta'],  kwargs['num_of_demos'], kwargs['noise_ratio']).replace('.','-')
+    return sample_record_filename_template.format(kwargs['dataset'], kwargs['demo_baseline'], kwargs['lr_theta'],  kwargs['num_of_demos'], kwargs['noise_ratio']).replace('.','-')
 
 def make_demo_list_filename(**kwargs):
-    return "demo_list_{}_{}_{}".format(kwargs['dataset'],  kwargs['num_of_demos'], kwargs['noise_ratio']).replace('.','-')
+    return "demo_list_{}_{}_{}_{}".format(kwargs['dataset'], kwargs['demo_baseline'],  kwargs['num_of_demos'], kwargs['noise_ratio']).replace('.','-')
 
 
 def store_object(obj,path, name):
@@ -113,10 +116,17 @@ class Super_human:
     self.lr_theta = lr_theta
     self.noise_ratio = noise_ratio
     self.noise = noise
+    self.demo_baseline = demo_baseline
     self.set_paths()
     self.dataset_ref = pd.read_csv(self.dataset_path, index_col=0) #self.dataset_ref = pd.read_csv('dataset_ref.csv', index_col=0)
     self.num_of_attributs = self.dataset_ref.shape[1] - 1 # discard self.label
     self.model_params = None
+    self.logi_params = {
+        'C': 100,
+        'penalty': 'l2',
+        'solver': 'newton-cg',
+        'max_iter': 1000
+    }
 
   class data_demo:
     def __init__(self, train_x=None, test_x=None, train_y=None, test_y=None, train_A=None, test_A=None, train_A_str=None, test_A_str=None ,idx_train=None, idx_test=None):
@@ -147,13 +157,7 @@ class Super_human:
   def base_model(self):
     
     self.model_name = "logistic-regression"
-    self.logi_params = {
-        'C': 100,
-        'penalty': 'l2',
-        'solver': 'newton-cg',
-        'max_iter': 1000
-    }
-    train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
+    train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
     self.train_data = pd.read_csv(train_file_path, index_col=0)
 
@@ -175,8 +179,28 @@ class Super_human:
     
     self.model_obj = LogisticRegression(**self.logi_params)
     self.model_obj.fit(X_train, Y_train)
-    # Scores on test set
-    self.pred_scores = self.model_obj.predict_proba(X_test) #self.pred_scores = self.model_obj.predict_proba(self.dataset_ref.drop(columns=['gender', 'self.label']))#[:, 1]
+    self.pred_scores = self.model_obj.predict_proba(X_test)
+
+    ####################################################################################
+    # self.model_obj = DP_fair_logloss_classifier(C=.005, random_initialization=True, verbose=False)
+    
+    # Y_train = Y_train.astype('float64')
+    # Y_test = Y_test.astype('float64')
+    # A_train = A_train.astype('float64')
+    # A_test = A_test.astype('float64')
+    # A_train = A_train - 1
+    # A_test = A_test - 1
+
+    # for c in list(X_train.columns):
+    #     if X_train[c].min() < 0 or X_train[c].max() > 1:
+    #         mu = X_train[c].mean()
+    #         s = X_train[c].std(ddof=0)
+    #         X_train.loc[:,c] = (X_train[c] - mu) / s
+    #         X_train.loc[:,c] = (X_train[c] - mu) / s
+    
+    # self.model_obj.fit(X_train.values,Y_train.values,A_train.values)
+    # self.pred_scores = self.model_obj.predict(X_test.values,A_test.values)
+    ############################################################################################
 
     self.base_dict = {"model_obj": self.model_obj,
                  "pred_scores": self.pred_scores,
@@ -192,67 +216,82 @@ class Super_human:
     with open(f'base_model_{dataset}.pickle', 'wb') as handle:
         pickle.dump(self.base_dict, handle)
 
-  def run_logistic_pp(self, model = "logistic_regression", data_demo = data_demo):
-    df_train = data_demo.train_x
+  def run_demo_baseline(self, data_demo = data_demo):
+    X_train = data_demo.train_x
     Y_train = data_demo.train_y
     A_train = data_demo.train_A
     A_str_test = data_demo.test_A_str
-    df_test = data_demo.test_x
+    X_test = data_demo.test_x
     Y_test = data_demo.test_y
     A_test = data_demo.test_A
-    Super_human.model_name = model
+    #Super_human.model_name = model
 
-    if model == "logistic_regression":
-      logi_param = {
-          'C': 100,
-          'penalty': 'l2',
-          'solver': 'newton-cg'
-      }
-      model_logi = LogisticRegression(**logi_param)
+    if self.demo_baseline == "pp":
+      model_logi = LogisticRegression(**self.logi_param)
+      model_logi.fit(X_train, Y_train)
+      # Post-processing
+      self.postprocess_est = ThresholdOptimizer(
+          estimator=model_logi,
+          constraints="demographic_parity", #"equalized_odds",
+          predict_method='auto',
+          prefit=True)
+      # Balanced data set is obtained by sampling the same number of points from the majority class (Y=0)
+      # as there are points in the minority class (Y=1)
+      balanced_idx1 = df_train[Y_train==1].index
+      pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
+      X_train_balanced = X_train.loc[pp_train_idx, :]
+      Y_train_balanced = Y_train.loc[pp_train_idx]
+      A_train_balanced = A_train.loc[pp_train_idx]
+
+      # Post-process fitting
+      self.postprocess_est.fit(X_train_balanced, Y_train_balanced, sensitive_features=A_train_balanced)
+      # Post-process preds
+      baseline_preds = self.postprocess_est.predict(X_test, sensitive_features=A_test)
+
+    elif self.demo_baseline == "fair_logloss":
+      mode = 'equalized_opportunity' #'equalized_odds'
+      C = .005
+      if mode == 'demographic_parity':
+        h = DP_fair_logloss_classifier(C=C, random_initialization=True, verbose=False)
+      elif mode == 'equalized_opportunity':
+        h = EOPP_fair_logloss_classifier(C=C, random_initialization=True, verbose=False)
+      elif mode == 'equalized_odds':
+        h = EODD_fair_logloss_classifier(C=C, random_initialization=True, verbose=False)    
+      else:
+        raise ValueError('Invalid second arg')
+    
+      Y_train = Y_train.astype('float64')
+      Y_test = Y_test.astype('float64')
+      A_train = A_train.astype('float64')
+      A_test = A_test.astype('float64')
+      A_train = A_train - 1
+      A_test = A_test - 1
+
+      for c in list(X_train.columns):
+          if X_train[c].min() < 0 or X_train[c].max() > 1:
+              mu = X_train[c].mean()
+              s = X_train[c].std(ddof=0)
+              X_train.loc[:,c] = (X_train[c] - mu) / s
+              X_train.loc[:,c] = (X_train[c] - mu) / s
       
+      h.fit(X_train.values,Y_train.values,A_train.values)
+      baseline_preds = h.predict(X_test.values,A_test.values)
+    
 
-    elif model == "lgbm_classifier":
-      lgb_params = {
-          'objective' : 'binary',
-          'metric' : 'auc',
-          'learning_rate': 0.03,
-          'num_leaves' : 10,
-          'max_depth' : 3
-      }
-      model_logi = lgb.LGBMClassifier(**lgb_params)
-      
-    model_logi.fit(df_train, Y_train)
-
-    # Scores on test set
-    test_scores_logi = model_logi.predict_proba(df_test)[:, 1]
-    # Train AUC
-    #roc_auc_score(Y_train, model_logi.predict_proba(df_train)[:, 1])
-
-
-    # Post-processing
-    self.postprocess_est = ThresholdOptimizer(
-        estimator=model_logi,
-        constraints="demographic_parity", #"equalized_odds",
-        predict_method='auto',
-        prefit=True)
-    # Balanced data set is obtained by sampling the same number of points from the majority class (Y=0)
-    # as there are points in the minority class (Y=1)
-    balanced_idx1 = df_train[Y_train==1].index
-    pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
-    df_train_balanced = df_train.loc[pp_train_idx, :]
-    Y_train_balanced = Y_train.loc[pp_train_idx]
-    A_train_balanced = A_train.loc[pp_train_idx]
-    # Post-process fitting
-    self.postprocess_est.fit(df_train_balanced, Y_train_balanced, sensitive_features=A_train_balanced)
-    # Post-process preds
-    postprocess_preds = self.postprocess_est.predict(df_test, sensitive_features=A_test)
-
+    ################################################################
+    if self.noise == True:
+        baseline_preds = self.add_noise(baseline_preds, protected=False) # add noise to the predicted label
+        #A_test_noisy = self.add_noise(A_test, protected=True)    # add noise to the protected attribute
+        #Y_test_noisy = self.add_noise(Y_test, protected=False)
     # Metrics
     models_dict = {
-              "ThresholdOptimizer": (postprocess_preds, postprocess_preds)}
-              
+              self.demo_baseline : (baseline_preds, baseline_preds)} 
+    ##############################################################
+    # # Metrics
+    # models_dict = {
+    #           self.demo_baseline : (baseline_preds, baseline_preds)}          
     result = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test)
-    
+
     return result
 
     
@@ -323,10 +362,10 @@ class Super_human:
     dataset_pp = dataset_ref.loc[idx_train].reset_index(drop=True) # use only pp portion of the data and leave SH Test portion
     dataset_sh = dataset_ref.loc[idx_test].reset_index(drop=True)
     
-    train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
+    train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
 
-    test_data_filename = "test_data_" + make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
+    test_data_filename = "test_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     test_file_path = os.path.join(self.test_data_path, test_data_filename)
 
     dataset_pp.to_csv(train_file_path)
@@ -343,62 +382,158 @@ class Super_human:
       dataset_temp['prev_index'] = index_list
       ##########################################################################
       new_demo = self.split_data(model, alpha=beta, dataset=dataset_temp,  mode="post-processing")
-      if self.noise == True:
-        new_demo = self.add_noise_new(new_demo)
+      # if self.noise == True:
+      #   new_demo = self.add_noise_new(new_demo)
       
-      metrics = self.run_logistic_pp(model = model, data_demo = new_demo)
+      metrics = self.run_demo_baseline(data_demo = new_demo) #self.run_logistic_pp(model = model, data_demo = new_demo)
       print("demo metrics: ")
       print(metrics)
       print("-----------------------------------")
       self.test_pp_logi[i] = metrics
       new_demo.metric_df = metrics
       for k in range(self.num_of_features):
-        new_demo.metric[k] = new_demo.metric_df.loc[self.feature[k]]["ThresholdOptimizer"]
+        new_demo.metric[k] = new_demo.metric_df.loc[self.feature[k]][self.demo_baseline]
 
       self.demo_list.append(new_demo)
       print("demo {}".format(i))
 
     file_dir = os.path.join(self.data_path)
-    demo_list_filename = make_demo_list_filename(dataset = self.dataset, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
+    demo_list_filename = make_demo_list_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     store_object(self.demo_list, file_dir, demo_list_filename)
 
+
+  def add_noise(self, data, protected=False):
+    if protected:
+      name = self.sensitive_feature
+      Y = data.to_frame(name=name).reset_index(drop=True)
+    else: 
+      name = self.label
+      Y = pd.DataFrame(data, columns=[self.label]).reset_index(drop=True)
+    
+    n = len(Y)
+    #print(n)
+    noisy_Y = copy.deepcopy(Y)
+    idx = np.random.permutation(range(n))[:int(self.noise_ratio*n)]
+    #print(idx)
+    if protected==True and self.dataset == 'Adult': # checked! works well!
+      # Y[idx] = Y[idx] - 1   # change 1,2 to 0,1
+      # noisy_Y[idx] = 1-Y[idx] # change 0,1 to 1,0
+      # noisy_Y[idx] = noisy_Y[idx] + 1   # revert 1,0 to 2,1
+      Y['gender'].loc[idx] = Y['gender'].loc[idx] - 1   # change 1,2 to 0,1
+      noisy_Y['gender'].loc[idx] = 1-Y['gender'].loc[idx] # change 0,1 to 1,0
+      noisy_Y['gender'].loc[idx] = noisy_Y['gender'].loc[idx] + 1   # revert 1,0 to 2,1
+    elif protected==True and self.dataset == 'COMPAS':
+      noisy_Y['race'].loc[idx] = 1-Y['race'].loc[idx]
+    elif protected==False:
+      noisy_Y[self.label].loc[idx] = 1 - Y[self.label].loc[idx] # if adding noise to the label
+      # print("###########################################")
+      # print(Y.loc[idx])
+      # print(noisy_Y.loc[idx])
+      # print("#########################################")
+    
+    return noisy_Y
 
   def add_noise_new(self, data_demo):  # works fine!
 
     Y_train = data_demo.train_y
+    Y_test = data_demo.test_y
     A_str_test = data_demo.test_A_str
     A_test = data_demo.test_A
+
+    A_str_train = data_demo.train_A_str
+    A_train = data_demo.train_A
+
 
     n_Y = len(Y_train)
     n_A = len(A_test)
 
+    n_A2 = len(A_train)
+
+    #Y_train_1 = Y_train.loc[Y_train == 1]
+    #Y_train_0 = Y_train.loc[Y_train == 0]
+
+    #n_Y_1 = len(Y_train_1)
+    #n_Y_0 = len(Y_train_0)
+
+    #idx_Y_1 = np.random.permutation(range(n_Y_1))[:int(self.noise_ratio*n_Y/2)]
+    #idx_Y_0 = np.random.permutation(range(n_Y_0))[:int(self.noise_ratio*n_Y/2)]
+
     idx_Y = np.random.permutation(range(n_Y))[:int(self.noise_ratio*n_Y)]
     idx_A = np.random.permutation(range(n_A))[:int(self.noise_ratio*n_A)]
 
+    idx_A2 = np.random.permutation(range(n_A2))[:int(self.noise_ratio*n_A2)]
+
+    #Y_train_1_index = Y_train_1.index
+    #Y_train_0_index = Y_train_0.index
+
+    A_train_index = A_train.index
+
     A_test_index = A_test.index
     Y_train_index = Y_train.index
+    Y_test_index = Y_test.index
+
+    #Y_train_1 = Y_train_1.reset_index(drop=True)
+    #Y_train_0 = Y_train_0.reset_index(drop=True)
+
+    A_train = A_train.reset_index(drop=True)
 
     A_test = A_test.reset_index(drop=True)
     Y_train = Y_train.reset_index(drop=True)
+    Y_test = Y_test.reset_index(drop=True)
+
+    #noisy_Y_train_1 = copy.deepcopy(Y_train_1)
+    #noisy_Y_train_0 = copy.deepcopy(Y_train_0)
+
+    noisy_A_train = copy.deepcopy(A_train)
 
     noisy_A_test = copy.deepcopy(A_test)
     noisy_Y_train = copy.deepcopy(Y_train)
+    noisy_Y_test = copy.deepcopy(Y_test)
+
+    A_train.loc[idx_A2] = A_train.loc[idx_A2] - 1   # change 1,2 to 0,1
+    noisy_A_train.loc[idx_A2] = 1 - A_train.loc[idx_A2] # change 0,1 to 1,0
+    noisy_A_train.loc[idx_A2] = noisy_A_train.loc[idx_A2] + 1   # revert 1,0 to 2,1
+    
+
     # flip protected attribute
     A_test.loc[idx_A] = A_test.loc[idx_A] - 1   # change 1,2 to 0,1
     noisy_A_test.loc[idx_A] = 1 - A_test.loc[idx_A] # change 0,1 to 1,0
     noisy_A_test.loc[idx_A] = noisy_A_test.loc[idx_A] + 1   # revert 1,0 to 2,1
+
+
+    
+    
     # flip label
+
+    #noisy_Y_train_1.loc[idx_Y_1] = 1 - Y_train_1.loc[idx_Y_1]
+    #noisy_Y_train_0.loc[idx_Y_0] = 1 - Y_train_0.loc[idx_Y_0]
+
     noisy_Y_train.loc[idx_Y] = 1 - Y_train.loc[idx_Y] # if adding noise to the label
+    #noisy_Y_test.loc[idx_Y2] = 1 - Y_test.loc[idx_Y2] # if adding noise to the label
+
+
+    #noisy_Y_train_1.index = Y_train_1_index
+    #noisy_Y_train_0.index = Y_train_0_index
+
+    noisy_A_train.index = A_train_index
+    noisy_A_train_str = noisy_A_train.map(self.dict_map)
+    noisy_A_train_str.index = A_train_index
+    data_demo.train_A = noisy_A_train
+    data_demo.train_A_str = noisy_A_train_str
+
+
 
     noisy_A_test.index = A_test_index
     noisy_Y_train.index = Y_train_index
+    #noisy_Y_test.index = Y_test_index
     noisy_A_test_str = noisy_A_test.map(self.dict_map)
     noisy_A_test_str.index = A_test_index
     
     data_demo.test_A = noisy_A_test
     data_demo.test_A_str = noisy_A_test_str
     data_demo.train_y = noisy_Y_train
-
+    #data_demo.train_y = pd.concat([noisy_Y_train_1, noisy_Y_train_0], axis=0)
+  
     return data_demo
 
   
@@ -408,7 +543,7 @@ class Super_human:
   def read_demo_list(self):
     file_dir = os.path.join(self.data_path)
     print("file_dir in read_demo_list: ", file_dir)
-    demo_list_filename = make_demo_list_filename(dataset = self.dataset, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
+    demo_list_filename = make_demo_list_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     print("demo_list file name: ")
     print(demo_list_filename)
     self.demo_list = load_object(file_dir, demo_list_filename)
@@ -428,7 +563,7 @@ class Super_human:
   def sample_superhuman(self):
     start_time = time.time()
 
-    train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
+    train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
 
     self.train_data = pd.read_csv(train_file_path, index_col=0)
@@ -485,7 +620,7 @@ class Super_human:
 
   def compute_exp_phi_X_Y(self):
     
-    train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
+    train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
 
     self.train_data = pd.read_csv(train_file_path, index_col=0)
@@ -533,7 +668,7 @@ class Super_human:
 
   def compute_alpha(self):
     start_time = time.time()
-    alpha = np.ones(self.num_of_features)
+    alpha = self.alpha#np.ones(self.num_of_features)
   
     for k in range(self.num_of_features):
       sorted_demos = []
@@ -545,11 +680,19 @@ class Super_human:
       
       sorted_demos.sort(key = lambda x: x[0]) #dominated_demos.sort(key = lambda x: x[0], reverse=True)   # sort based on demo loss
       sorted_demos = np.array(sorted_demos)
-      alpha[k] = np.max(alpha) # default value in case it didn't change
+      alpha[k] = np.mean(alpha) # default value in case it didn't change
+      #print(self.feature[k])
+      #print("demo_loss, sample_loss: ")
+      #print(sorted_demos)
       for m, demo in enumerate(sorted_demos):
-        if (demo[0] > demo[1]):
+        avg_sample_loss = np.mean([demo[1] for demo in sorted_demos])
+        if (demo[0] > demo[1] and 1.0/(demo[0] - demo[1]) < 100):
           alpha[k] = 1.0/(demo[0] - demo[1])
-        if (demo[1]) <= np.mean([x[0] for x in sorted_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
+        else:
+          alpha[k] = np.mean(alpha)
+          #print(alpha[k])
+        if (avg_sample_loss) <= np.mean([x[0] for x in sorted_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
+          print("chosen!")
           break
 
     print("--- %s end of compute_alpha ---" % (time.time() - start_time))
@@ -559,18 +702,15 @@ class Super_human:
     find_gamma_superhuman(self.demo_list, self.model_params)
     return alpha
 
-  def eval_model_pp(self, mode="demographic_parity"):
-    #train_file_path = os.path.join(self.train_data_path, f"train_data_{dataset}.csv")
-    #test_file_path = os.path.join(self.test_data_path, f"test_data_{dataset}.csv")
+  def eval_model_baseline(self, baseline="pp", mode="demographic_parity"):
 
-    train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
+    train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
-    test_data_filename = "test_data_" + make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
+    test_data_filename = "test_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     test_file_path = os.path.join(self.test_data_path, test_data_filename)
 
-
-    self.train_data = pd.read_csv(train_file_path, index_col=0)#.drop(columns=['prev_index'])
-    self.test_data = pd.read_csv(test_file_path, index_col=0)#.drop(columns=['prev_index'])
+    self.train_data = pd.read_csv(train_file_path, index_col=0)
+    self.test_data = pd.read_csv(test_file_path, index_col=0)
     A_train = self.train_data[self.sensitive_feature]
     A_test = self.test_data[self.sensitive_feature]
     A_str_train = A_train.map(self.dict_map)
@@ -581,39 +721,75 @@ class Super_human:
     X_train = self.train_data.drop(columns=[self.label])
     X_test = self.test_data.drop(columns=[self.label])
 
-    model_logi = LogisticRegression(**self.logi_params)
-    model_logi.fit(X_train, Y_train)
+    if baseline == "pp":
 
-    # Post-processing
-    postprocess_est = ThresholdOptimizer(
-        estimator=model_logi,
-        constraints=mode, #"equalized_odds",
-        predict_method='auto',
-        prefit=True)
-    # Balanced data set is obtained by sampling the same number of points from the majority class (Y=0)
-    # as there are points in the minority class (Y=1)
-    balanced_idx1 = X_train[Y_train==1].index
-    pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
-    X_train_balanced = X_train.loc[pp_train_idx, :]
-    Y_train_balanced = Y_train.loc[pp_train_idx]
-    A_train_balanced = A_train.loc[pp_train_idx]
-    # Post-process fitting
+      model_logi = LogisticRegression(**self.logi_params)
+      model_logi.fit(X_train, Y_train)
 
-    postprocess_est.fit(X_train_balanced, Y_train_balanced, sensitive_features=A_train_balanced)
-    # Post-process preds
-    postprocess_preds = postprocess_est.predict(X_test, sensitive_features=A_test)
+      # Post-processing
+      postprocess_est = ThresholdOptimizer(
+          estimator=model_logi,
+          constraints=mode, #"equalized_odds",
+          predict_method='auto',
+          prefit=True)
+      # Balanced data set is obtained by sampling the same number of points from the majority class (Y=0)
+      # as there are points in the minority class (Y=1)
+      balanced_idx1 = X_train[Y_train==1].index
+      pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
+      X_train_balanced = X_train.loc[pp_train_idx, :]
+      Y_train_balanced = Y_train.loc[pp_train_idx]
+      A_train_balanced = A_train.loc[pp_train_idx]
+      # Post-process fitting
 
+      postprocess_est.fit(X_train_balanced, Y_train_balanced, sensitive_features=A_train_balanced)
+      # Post-process preds
+      baseline_preds = postprocess_est.predict(X_test, sensitive_features=A_test)
+    
+    elif baseline == "fair_logloss":
+      C = .005
+      if mode == 'demographic_parity':
+        h = DP_fair_logloss_classifier(C=C, random_initialization=True, verbose=False)
+      elif mode == 'equalized_opportunity':
+        h = EOPP_fair_logloss_classifier(C=C, random_initialization=True, verbose=False)
+      elif mode == 'equalized_odds':
+        h = EODD_fair_logloss_classifier(C=C, random_initialization=True, verbose=False)    
+      else:
+        raise ValueError('Invalid second arg')
+    
+      Y_train = Y_train.astype('float64')
+      Y_test = Y_test.astype('float64')
+      A_train = A_train.astype('float64')
+      A_test = A_test.astype('float64')
+      A_train = A_train - 1
+      A_test = A_test - 1
+
+      for c in list(X_train.columns):
+          if X_train[c].min() < 0 or X_train[c].max() > 1:
+              mu = X_train[c].mean()
+              s = X_train[c].std(ddof=0)
+              X_train.loc[:,c] = (X_train[c] - mu) / s
+              X_train.loc[:,c] = (X_train[c] - mu) / s
+      
+      h.fit(X_train.values,Y_train.values,A_train.values)
+      baseline_preds = h.predict(X_test.values,A_test.values)
+      baseline_preds[np.isnan(baseline_preds)] = 0
+      #print(sum(np.isnan(baseline_preds)))
+      # violation = h.fairness_violation(X_test.values, Y_test.values, A_test.values)
+      # print(baseline+" "+mode+" violation: ")
+      # print(violation)
+      
     # Metrics
     models_dict = {
-              "Post_processing": (postprocess_preds, postprocess_preds)}
+              baseline+"_"+mode : (baseline_preds, baseline_preds)}
     return get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test)
+    
 
 
 
   def eval_model(self, mode):
     if mode == "train":
       #train_file_path = os.path.join(self.train_data_path, f"train_data_{dataset}.csv")
-      train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
+      train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
       train_file_path = os.path.join(self.train_data_path, train_data_filename)
 
       self.train_data = pd.read_csv(train_file_path, index_col=0)#.drop(columns=['prev_index'])
@@ -624,7 +800,7 @@ class Super_human:
       X = self.train_data.drop(columns=[self.label])
     elif mode == "test-sh" or mode == "test-pp":
       #test_file_path = os.path.join(self.test_data_path, f"test_data_{dataset}.csv")
-      test_data_filename = "test_data_" + make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
+      test_data_filename = "test_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
       test_file_path = os.path.join(self.test_data_path, test_data_filename)
 
       self.test_data = pd.read_csv(test_file_path, index_col=0)#.drop(columns=['prev_index'])
@@ -692,15 +868,15 @@ class Super_human:
       self.grad_theta.append(grad_theta)
       subdom_tensor_sum_arr.append(subdom_tensor_sum)
       self.eval.append(eval_i)
-      self.model_params = {"model":self.model_obj, "theta": self.model_obj.coef_, "alpha":self.alpha, "eval": self.eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features}
+      self.model_params = {"model":self.model_obj, "theta": self.model_obj.coef_, "alpha":self.alpha, "eval": self.eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features, "demo_baseline": self.demo_baseline}
     #model_params = {"model":self.model_obj, "theta": self.model_obj.coef_, "alpha":self.alpha, "eval": self.eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features}
-    experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
+    experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     file_dir = os.path.join(self.train_data_path)
     store_object(self.model_params, file_dir, experiment_filename)
 
 
   def read_model_from_file(self):
-    experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
+    experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     file_dir = os.path.join(self.train_data_path)
     self.model_params = load_object(file_dir,experiment_filename)
     self.model_obj = self.model_params["model"]
@@ -719,16 +895,28 @@ class Super_human:
 
   def test_model(self):
     eval_sh = self.eval_model(mode = "test-sh")
-    eval_pp_dp = self.eval_model_pp(mode = "demographic_parity")
-    eval_pp_eq_odds = self.eval_model_pp(mode = "equalized_odds")
+    eval_pp_dp = self.eval_model_baseline(baseline = "pp", mode = "demographic_parity")
+    eval_pp_eqodds = self.eval_model_baseline(baseline = "pp", mode = "equalized_odds")
+    eval_fairll_dp = self.eval_model_baseline(baseline = "fair_logloss", mode = "demographic_parity")
+    eval_fairll_eqodds = self.eval_model_baseline(baseline = "fair_logloss", mode = "equalized_odds")
+    eval_fairll_eqopp = self.eval_model_baseline(baseline = "fair_logloss", mode = "equalized_opportunity")
     print()
     print(eval_sh)
     print()
     print(eval_pp_dp)
+    print()
+    print(eval_fairll_dp)
+    print()
+    print(eval_fairll_eqopp)
+    print()
+    print(eval_fairll_eqodds)
     self.model_params["eval_sh"]= eval_sh
     self.model_params["eval_pp_dp"]= eval_pp_dp
-    self.model_params["eval_pp_eq_odds"] = eval_pp_eq_odds
-    experiment_filename = make_experiment_filename(dataset = self.dataset, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
+    self.model_params["eval_pp_eq_odds"] = eval_pp_eqodds
+    self.model_params["eval_fairll_dp"] = eval_fairll_dp
+    self.model_params["eval_fairll_eqodds"] = eval_fairll_eqodds
+    self.model_params["eval_fairll_eqopp"] = eval_fairll_eqopp
+    experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     file_dir = os.path.join(self.test_data_path)
     store_object(self.model_params, file_dir, experiment_filename)
 
