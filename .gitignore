@@ -1,6 +1,2 @@
 experiments/data/*
 experiments/noise/data/*
-experiments/train/*
-experiments/noise/train/*
-experiments/test/*
-experiments/noise/test/*
