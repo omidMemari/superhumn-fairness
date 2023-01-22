@@ -19,7 +19,7 @@ lr_theta = 0.001
 num_of_demos = 50
 num_of_features = 4
 demo_baseline = "fair_logloss"
-noise_ratio = 0.1
+noise_ratio = 0.2
 noise_list = [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]#, 0.09, 0.10]#, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20]
 
 def plot_features(noise, dataset, noise_ratio):
@@ -69,9 +69,8 @@ def plot_features(noise, dataset, noise_ratio):
             newY = y + alpha[i]
             xlim = max(max(demo_metric_j), newX)*1.2
             ylim = max(max(demo_metric_i), newY)*1.2
+            #ymin = 0, ymax = max(xs)
             # xLeft is (xlim - x)*0.8 + x
-            yLeft = (ylim - y)*0.8 + y
-            xBottom = (xlim - x)*0.8 + x
             plt.xlabel(name[j]) #plt.xlabel(feature[j])
             plt.ylabel(name[i]) #plt.ylabel(feature[i])
             plt.scatter(demo_metric_j, demo_metric_i, marker='*', c=[(255/255,211/255,107/255)], label = 'post_proc_demos')
@@ -82,12 +81,14 @@ def plot_features(noise, dataset, noise_ratio):
             plt.plot(x_pp_eq_odds, y_pp_eq_odds, 'go', label = 'post_proc_eq_odds')
             # plot fair log-loss
             plt.plot(x_fairll_dp, y_pp_dp, marker='P', color='cyan', label = 'fair_logloss_dp')
-            plt.plot(x_fairll_eq_odds, y_pp_eq_odds, marker='P', color='orange', label = 'fair_logloss_eq_odds')
-
-            plt.plot([x, x], [y, ylim], 'r')
-            plt.plot([x, xlim], [y, y], 'r')
-            plt.plot([newX, newX], [newY, ylim], 'r--')
-            plt.plot([newX, xlim], [newY, newY], 'r--')
+            plt.plot(x_fairll_eq_odds, y_pp_eq_odds, marker='P', color='indigo', label = 'fair_logloss_eq_odds')
+            xmin, xmax, ymin, ymax = plt.axis()
+            yLeft = (ymax - y)*0.8 + y
+            xBottom = (ymax - x)*0.8 + x
+            plt.plot([x, x], [y, 0.95*ymax], 'r')
+            plt.plot([x, 0.95*xmax], [y, y], 'r')
+            plt.plot([newX, newX], [newY, 0.95*ymax], 'r--')
+            plt.plot([newX, 0.95*xmax], [newY, newY], 'r--')
             plt.annotate('', xy=(newX, yLeft), xytext=(x, yLeft), xycoords='data', textcoords='data',
                         arrowprops={'arrowstyle': '<->'})
             # write the text to the top of the arrow above
@@ -105,7 +106,7 @@ def plot_features(noise, dataset, noise_ratio):
             #plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left", mode="expand", borderaxespad=0, ncol=2)
             plt.legend(reversed(handles), reversed(labels),loc='best', ncol=1, fontsize="small")
             plt.title(dataset)
-            plot_file_name = short[feature[j]] + "_vs_" + short[feature[i]] + "_{}_{}_{}".format(dataset, model_params['demo_baseline'], noise_ratio).replace('.','-') + ".pdf"
+            plot_file_name = short[feature[j]] + "_vs_" + short[feature[i]] + "_{}_{}_{}".format(dataset, model_params['demo_baseline'], noise_ratio).replace('.','-') + ".png"
             plots_path_dir = os.path.join(sh_obj.plots_path, plot_file_name) # short[feature[j]] + "_vs_"+ short[feature[i]] + ".png")
             plt.savefig(plots_path_dir)
 
@@ -119,6 +120,7 @@ def plot_noise_test(dataset):
         print("noise_idx: ", noise_idx)
         sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
         experiment_filename = make_experiment_filename(dataset = dataset, demo_baseline = demo_baseline, lr_theta = lr_theta, num_of_demos = num_of_demos, noise_ratio = noise_ratio)
+        #experiment_filename = "{}_{}_{}_{}".format(dataset, lr_theta, num_of_demos, noise_ratio).replace('.','-')
         file_dir = os.path.join(sh_obj.test_data_path)
         model_params = load_object(file_dir,experiment_filename)
 
@@ -145,7 +147,7 @@ def plot_noise_test(dataset):
     plt.grid(True)
     plt.legend(reversed(handles), reversed(labels),loc='best', ncol=1, fontsize="small")
     plt.title(dataset)
-    plots_path_dir = os.path.join(sh_obj.plots_path, "noise_vs_gamma_superhuman_" +"_{}_{}".format(dataset, demo_baseline) + ".pdf")
+    plots_path_dir = os.path.join(sh_obj.plots_path, "noise_vs_gamma_superhuman_" +"_{}_{}".format(dataset, demo_baseline) + ".png")
     plt.savefig(plots_path_dir)
 
 

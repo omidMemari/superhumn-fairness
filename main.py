@@ -46,17 +46,17 @@ feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds 
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}}
-lr_theta = 0.001
-iters = 90
+lr_theta = 0.01
+iters = 30
 num_of_demos = 50
 num_of_features = 4
 alpha = 0.5
 beta = 0.5
 lamda = 0.01
-demo_baseline = "fair_logloss"
+demo_baseline = "pp" #"fair_logloss"
 model = "logistic_regression"
-noise_ratio = 0.09
-noise_list = [0.02]#0.03, 0.04]#[0.06, 0.07, 0.08, 0.09]##[0.16, 0.17, 0.18, 0.19, 0.20]#[0.11, 0.12, 0.13, 0.14, 0.15]#########
+noise_ratio = 0.2
+noise_list = [0.2]#0.03, 0.04]#[0.06, 0.07, 0.08, 0.09]##[0.16, 0.17, 0.18, 0.19, 0.20]#[0.11, 0.12, 0.13, 0.14, 0.15]#########
 
 
 
@@ -744,6 +744,7 @@ class Super_human:
       postprocess_est.fit(X_train_balanced, Y_train_balanced, sensitive_features=A_train_balanced)
       # Post-process preds
       baseline_preds = postprocess_est.predict(X_test, sensitive_features=A_test)
+      baseline_scores=None
     
     elif baseline == "fair_logloss":
       C = .005
@@ -772,15 +773,20 @@ class Super_human:
       
       h.fit(X_train.values,Y_train.values,A_train.values)
       baseline_preds = h.predict(X_test.values,A_test.values)
+      baseline_scores = h.predict_proba(X_test.values,A_test.values) 
       baseline_preds[np.isnan(baseline_preds)] = 0
       #print(sum(np.isnan(baseline_preds)))
-      # violation = h.fairness_violation(X_test.values, Y_test.values, A_test.values)
-      # print(baseline+" "+mode+" violation: ")
-      # print(violation)
+      violation = h.fairness_violation(X_test.values, Y_test.values, A_test.values)
+      baselien_test_error = h.score(X_test.values, Y_test.values, A_test.values) 
+      print(baseline+" "+mode+" violation: ")
+      print(violation)
+      print("test error: ")
+      print(baselien_test_error)
+      print()
       
     # Metrics
     models_dict = {
-              baseline+"_"+mode : (baseline_preds, baseline_preds)}
+              baseline+"_"+mode : (baseline_preds, baseline_scores)}
     return get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test)
     
 
