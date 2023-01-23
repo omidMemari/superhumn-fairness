@@ -15,10 +15,10 @@ colors = {0:'orange', 1: 'red', 2: 'blue', 3:'green', 4:'black'}
 feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds difference", 3: "Predictive value difference"}
 name = {0: "Prediction error", 1: "D.DP", 2: "D.EqOdds", 3: "D.PRP"}
 short = {"ZeroOne": "error", "Demographic parity difference": "DP", "D.FNR": "FNR", "D.FPR": "FPR", "Equalized odds difference": "EqOdds", "D.PPV": "PPV", "D.NPV":"NPV", "Predictive value difference":"PRP"}
-lr_theta = 0.001
+lr_theta = 0.03
 num_of_demos = 50
 num_of_features = 4
-demo_baseline = "fair_logloss"
+demo_baseline = "pp"#"fair_logloss"
 noise_ratio = 0.2
 noise_list = [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]#, 0.09, 0.10]#, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20]
 
@@ -61,34 +61,45 @@ def plot_features(noise, dataset, noise_ratio):
             y_pp_eq_odds = model_params['eval_pp_eq_odds'].loc[feature[i]][0]
             ### fair log-loss
             x_fairll_dp = model_params['eval_fairll_dp'].loc[feature[j]][0]
-            y_pp_dp = model_params['eval_fairll_dp'].loc[feature[i]][0]
+            y_fairll_dp = model_params['eval_fairll_dp'].loc[feature[i]][0]
             x_fairll_eq_odds = model_params['eval_fairll_eqodds'].loc[feature[j]][0]
             y_fairll_eq_odds = model_params['eval_fairll_eqodds'].loc[feature[i]][0]
+            x_fairll_eq_opp = model_params['eval_fairll_eqopp'].loc[feature[j]][0]
+            y_fairll_eq_opp = model_params['eval_fairll_eqopp'].loc[feature[i]][0]
+            
 
             newX = x + alpha[j]
             newY = y + alpha[i]
-            xlim = max(max(demo_metric_j), newX)*1.2
-            ylim = max(max(demo_metric_i), newY)*1.2
+            xlim = max(max(demo_metric_j), x_fairll_eq_odds, x_fairll_dp , x_pp_eq_odds, x_pp_dp, newX)*1.2
+            ylim = max(max(demo_metric_i), y_fairll_eq_odds, y_fairll_dp , y_pp_eq_odds, y_pp_dp, newY)*1.2
             #ymin = 0, ymax = max(xs)
             # xLeft is (xlim - x)*0.8 + x
             plt.xlabel(name[j]) #plt.xlabel(feature[j])
             plt.ylabel(name[i]) #plt.ylabel(feature[i])
             plt.scatter(demo_metric_j, demo_metric_i, marker='*', c=[(255/255,211/255,107/255)], label = 'post_proc_demos')
-            plt.plot(x, y, 'ro', label = 'super_human_train')
-            plt.plot(x_test, y_test, marker='X', color='black', label = 'super_human_test')
+            plt.plot(x, y, 'ro', label = 'superhuman_train')
+            plt.plot(x_test, y_test, marker='X', color='black', label = 'superhuman_test')
             # plot post-processing
             plt.plot(x_pp_dp, y_pp_dp, 'bo', label = 'post_proc_dp')
-            plt.plot(x_pp_eq_odds, y_pp_eq_odds, 'go', label = 'post_proc_eq_odds')
+            plt.plot(x_pp_eq_odds, y_pp_eq_odds, 'go', label = 'post_proc_eqodds')
             # plot fair log-loss
-            plt.plot(x_fairll_dp, y_pp_dp, marker='P', color='cyan', label = 'fair_logloss_dp')
-            plt.plot(x_fairll_eq_odds, y_pp_eq_odds, marker='P', color='indigo', label = 'fair_logloss_eq_odds')
+            plt.plot(x_fairll_dp, y_fairll_dp, marker='P', color='cyan', label = 'fair_logloss_dp')
+            plt.plot(x_fairll_eq_odds, y_fairll_eq_odds, marker='P', color='indigo', label = 'fair_logloss_eqodds')
+            #plt.plot(x_fairll_dp, y_fairll_eq_opp, marker='P', color='cyan', label = 'fair_logloss_eqopp')
             xmin, xmax, ymin, ymax = plt.axis()
-            yLeft = (ymax - y)*0.8 + y
-            xBottom = (ymax - x)*0.8 + x
-            plt.plot([x, x], [y, 0.95*ymax], 'r')
-            plt.plot([x, 0.95*xmax], [y, y], 'r')
-            plt.plot([newX, newX], [newY, 0.95*ymax], 'r--')
-            plt.plot([newX, 0.95*xmax], [newY, newY], 'r--')
+            
+            # plt.plot([x, x], [y, 0.95*ymax], 'r')
+            # plt.plot([x, 0.95*xmax], [y, y], 'r')
+            # plt.plot([newX, newX], [newY, 0.95*ymax], 'r--')
+            # plt.plot([newX, 0.95*xmax], [newY, newY], 'r--')
+            # yLeft = (ymax - y)*0.8 + y
+            # xBottom = (ymax - x)*0.8 + x
+            yLeft = (ylim - y)*0.8 + y
+            xBottom = (xlim - x)*0.8 + x
+            plt.plot([x, x], [y, ylim], 'r')
+            plt.plot([x, xlim], [y, y], 'r')
+            plt.plot([newX, newX], [newY, ylim], 'r--')
+            plt.plot([newX, xlim], [newY, newY], 'r--')
             plt.annotate('', xy=(newX, yLeft), xytext=(x, yLeft), xycoords='data', textcoords='data',
                         arrowprops={'arrowstyle': '<->'})
             # write the text to the top of the arrow above
@@ -100,8 +111,6 @@ def plot_features(noise, dataset, noise_ratio):
                     fr"$1/\alpha_{{{short[feature[i]]}}}$", horizontalalignment='left', verticalalignment='center')
             
             handles, labels = plt.gca().get_legend_handles_labels()
-            #plt.xlabel('Fairness Violation')
-            #plt.ylabel('NDCG')
             plt.grid(True)
             #plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left", mode="expand", borderaxespad=0, ncol=2)
             plt.legend(reversed(handles), reversed(labels),loc='best', ncol=1, fontsize="small")
