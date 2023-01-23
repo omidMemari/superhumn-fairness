@@ -832,7 +832,36 @@ class Super_human:
       elif mode == "equalized_odds":
         metrics[baseline+"_"+mode]['Equalized odds difference'] = violation
 
-      return metrics     
+      return metrics
+    
+    elif baseline == "MFOpt":
+      test_data_filename = "MFOpt_" + dataset + ".csv"
+      test_file_path = os.path.join(self.test_data_path, test_data_filename)
+      #self.train_data = pd.read_csv(train_file_path, index_col=0)
+      self.test_data = pd.read_csv(test_file_path, index_col=0)
+      #A_train = self.train_data[self.sensitive_feature]
+      A_test = self.test_data['g']
+      #A_str_train = A_train.map(self.dict_map)
+      A_str_test = A_test.map(self.dict_map)
+      # Extract the target
+      #Y_train = self.train_data['bin']
+      Y_test = self.test_data['y']
+      baseline_preds = self.test_data['bin'] - 1
+      baseline_scores = self.test_data.index
+      err, exp_zeroone = self.compute_error(baseline_preds, baseline_scores, Y_test.values)
+      print("expected_error: ")
+      print(exp_zeroone)
+      #X_train = self.train_data.drop(columns=[self.label])
+      #X_test = self.test_data.drop(columns=[self.label])
+       # Metrics
+      models_dict = {
+                baseline : (baseline_preds, baseline_preds)}
+      metrics = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test)
+      metrics[baseline]['ZeroOne'] = exp_zeroone
+      return metrics
+
+
+
   def compute_error(self, Yhat,proba,Y):
     err = 1 - np.sum(Yhat == Y) / Y.shape[0] 
     exp_zeroone = np.mean(np.where(Y == 1 , 1 - proba, proba))
@@ -974,6 +1003,7 @@ class Super_human:
     eval_fairll_dp = self.eval_model_baseline(baseline = "fair_logloss", mode = "demographic_parity")
     eval_fairll_eqodds = self.eval_model_baseline(baseline = "fair_logloss", mode = "equalized_odds")
     eval_fairll_eqopp = self.eval_model_baseline(baseline = "fair_logloss", mode = "equalized_opportunity")
+    eval_MFOpt = self.eval_model_baseline(baseline = "MFOpt")
     print()
     print(eval_sh)
     print()
@@ -986,12 +1016,15 @@ class Super_human:
     print(eval_fairll_eqopp)
     print()
     print(eval_fairll_eqodds)
+    print()
+    print(eval_MFOpt)
     self.model_params["eval_sh"]= eval_sh
     self.model_params["eval_pp_dp"]= eval_pp_dp
     self.model_params["eval_pp_eq_odds"] = eval_pp_eqodds
     self.model_params["eval_fairll_dp"] = eval_fairll_dp
     self.model_params["eval_fairll_eqodds"] = eval_fairll_eqodds
     self.model_params["eval_fairll_eqopp"] = eval_fairll_eqopp
+    self.model_params["eval_MFOpt"]= eval_MFOpt
     experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     file_dir = os.path.join(self.test_data_path)
     store_object(self.model_params, file_dir, experiment_filename)
