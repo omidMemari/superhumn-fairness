@@ -46,14 +46,14 @@ feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds 
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}}
-lr_theta = 0.01
-iters = 30
+lr_theta = 0.03
+iters = 8
 num_of_demos = 50
 num_of_features = 4
 alpha = 0.5
 beta = 0.5
 lamda = 0.01
-demo_baseline = "pp" #"fair_logloss"
+demo_baseline = "pp"#"fair_logloss"
 model = "logistic_regression"
 noise_ratio = 0.2
 noise_list = [0.2]#0.03, 0.04]#[0.06, 0.07, 0.08, 0.09]##[0.16, 0.17, 0.18, 0.19, 0.20]#[0.11, 0.12, 0.13, 0.14, 0.15]#########
@@ -107,6 +107,7 @@ class Super_human:
     self.num_of_features = num_of_features
     self.feature = feature
     self.alpha = [1.0 for _ in range(self.num_of_features)]
+    self.gamma_superhuman = [0.0 for _ in range(self.num_of_features)]
     self.label = label_dict[dataset] ##
     print("self.label: ", self.label)
     self.sensitive_feature = protected_dict[dataset] ##
@@ -227,7 +228,7 @@ class Super_human:
     #Super_human.model_name = model
 
     if self.demo_baseline == "pp":
-      model_logi = LogisticRegression(**self.logi_param)
+      model_logi = LogisticRegression(**self.logi_params)
       model_logi.fit(X_train, Y_train)
       # Post-processing
       self.postprocess_est = ThresholdOptimizer(
@@ -237,7 +238,7 @@ class Super_human:
           prefit=True)
       # Balanced data set is obtained by sampling the same number of points from the majority class (Y=0)
       # as there are points in the minority class (Y=1)
-      balanced_idx1 = df_train[Y_train==1].index
+      balanced_idx1 = X_train[Y_train==1].index
       pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
       X_train_balanced = X_train.loc[pp_train_idx, :]
       Y_train_balanced = Y_train.loc[pp_train_idx]
@@ -668,7 +669,7 @@ class Super_human:
 
   def compute_alpha(self):
     start_time = time.time()
-    alpha = self.alpha#np.ones(self.num_of_features)
+    alpha = np.ones(self.num_of_features)
   
     for k in range(self.num_of_features):
       sorted_demos = []
@@ -679,20 +680,17 @@ class Super_human:
         sorted_demos.append((demo_loss, sample_loss))
       
       sorted_demos.sort(key = lambda x: x[0]) #dominated_demos.sort(key = lambda x: x[0], reverse=True)   # sort based on demo loss
-      sorted_demos = np.array(sorted_demos)
-      alpha[k] = np.mean(alpha) # default value in case it didn't change
       #print(self.feature[k])
       #print("demo_loss, sample_loss: ")
       #print(sorted_demos)
+      sorted_demos = np.array(sorted_demos)
+      alpha[k] = 100 #max(self.alpha) #np.mean(self.alpha) # default value in case it didn't change using previous alpha values
+      # print("alpha {}", k)
+      # print(alpha)
       for m, demo in enumerate(sorted_demos):
-        avg_sample_loss = np.mean([demo[1] for demo in sorted_demos])
-        if (demo[0] > demo[1] and 1.0/(demo[0] - demo[1]) < 100):
-          alpha[k] = 1.0/(demo[0] - demo[1])
-        else:
-          alpha[k] = np.mean(alpha)
-          #print(alpha[k])
-        if (avg_sample_loss) <= np.mean([x[0] for x in sorted_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
-          print("chosen!")
+        if (demo[0] > demo[1]):
+          alpha[k] = min(100, 1.0/(demo[0] - demo[1]))  ### limit max alpha to 100
+        if (demo[1] + self.lamda) <= np.mean([x[0] for x in sorted_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
           break
 
     print("--- %s end of compute_alpha ---" % (time.time() - start_time))
@@ -701,6 +699,42 @@ class Super_human:
     #model_params = {"eval": self.eval}
     find_gamma_superhuman(self.demo_list, self.model_params)
     return alpha
+
+  # def compute_alpha(self):
+  #   start_time = time.time()
+  #   alpha = self.alpha#np.ones(self.num_of_features)
+  
+  #   for k in range(self.num_of_features):
+  #     sorted_demos = []
+  #     alpha_candidate = []
+  #     for j in range(self.num_of_demos):
+  #       sample_loss = self.sample_loss[j, k]
+  #       demo_loss = self.demo_list[j].metric[k] 
+  #       sorted_demos.append((demo_loss, sample_loss))
+      
+  #     sorted_demos.sort(key = lambda x: x[0]) #dominated_demos.sort(key = lambda x: x[0], reverse=True)   # sort based on demo loss
+  #     sorted_demos = np.array(sorted_demos)
+  #     alpha[k] = np.mean(alpha) # default value in case it didn't change
+  #     #print(self.feature[k])
+  #     #print("demo_loss, sample_loss: ")
+  #     #print(sorted_demos)
+  #     for m, demo in enumerate(sorted_demos):
+  #       avg_sample_loss = np.mean([demo[1] for demo in sorted_demos])
+  #       if (demo[0] > demo[1] and 1.0/(demo[0] - demo[1]) < 100):
+  #         alpha[k] = 1.0/(demo[0] - demo[1])
+  #       else:
+  #         alpha[k] = np.mean(alpha)
+  #         #print(alpha[k])
+  #       if (avg_sample_loss) <= np.mean([x[0] for x in sorted_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
+  #         print("chosen!")
+  #         break
+
+  #   print("--- %s end of compute_alpha ---" % (time.time() - start_time))
+  #   print("alpha : ")
+  #   print(alpha)
+  #   #model_params = {"eval": self.eval}
+  #   find_gamma_superhuman(self.demo_list, self.model_params)
+  #   return alpha
 
   def eval_model_baseline(self, baseline="pp", mode="demographic_parity"):
 
@@ -729,7 +763,7 @@ class Super_human:
       # Post-processing
       postprocess_est = ThresholdOptimizer(
           estimator=model_logi,
-          constraints=mode, #"equalized_odds",
+          constraints=mode,
           predict_method='auto',
           prefit=True)
       # Balanced data set is obtained by sampling the same number of points from the majority class (Y=0)
@@ -744,7 +778,10 @@ class Super_human:
       postprocess_est.fit(X_train_balanced, Y_train_balanced, sensitive_features=A_train_balanced)
       # Post-process preds
       baseline_preds = postprocess_est.predict(X_test, sensitive_features=A_test)
-      baseline_scores=None
+       # Metrics
+      models_dict = {
+                baseline+"_"+mode : (baseline_preds, baseline_preds)}
+      return get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test)
     
     elif baseline == "fair_logloss":
       C = .005
@@ -757,63 +794,78 @@ class Super_human:
       else:
         raise ValueError('Invalid second arg')
     
-      Y_train = Y_train.astype('float64')
-      Y_test = Y_test.astype('float64')
-      A_train = A_train.astype('float64')
-      A_test = A_test.astype('float64')
-      A_train = A_train - 1
-      A_test = A_test - 1
+      # Y_train = Y_train.astype('float64')
+      # Y_test = Y_test.astype('float64')
+      # A_train = A_train.astype('float64')
+      # A_test = A_test.astype('float64')
+      if dataset == 'Adult':
+        A_train = A_train - 1
+        A_test = A_test - 1
 
-      for c in list(X_train.columns):
-          if X_train[c].min() < 0 or X_train[c].max() > 1:
-              mu = X_train[c].mean()
-              s = X_train[c].std(ddof=0)
-              X_train.loc[:,c] = (X_train[c] - mu) / s
-              X_train.loc[:,c] = (X_train[c] - mu) / s
+      # for c in list(X_train.columns):
+      #     if X_train[c].min() < 0 or X_train[c].max() > 1:
+      #         mu = X_train[c].mean()
+      #         s = X_train[c].std(ddof=0)
+      #         X_train.loc[:,c] = (X_train[c] - mu) / s
+      #         X_train.loc[:,c] = (X_train[c] - mu) / s
       
       h.fit(X_train.values,Y_train.values,A_train.values)
       baseline_preds = h.predict(X_test.values,A_test.values)
       baseline_scores = h.predict_proba(X_test.values,A_test.values) 
-      baseline_preds[np.isnan(baseline_preds)] = 0
-      #print(sum(np.isnan(baseline_preds)))
+      baseline_preds[np.isnan(baseline_preds)] = 1
       violation = h.fairness_violation(X_test.values, Y_test.values, A_test.values)
-      baselien_test_error = h.score(X_test.values, Y_test.values, A_test.values) 
+      accuracy = h.score(X_test.values, Y_test.values, A_test.values) 
+      err, exp_zeroone = self.compute_error(baseline_preds, baseline_scores, Y_test.values)
       print(baseline+" "+mode+" violation: ")
       print(violation)
-      print("test error: ")
-      print(baselien_test_error)
+      print("expected_error: ")
+      print(exp_zeroone)
       print()
-      
-    # Metrics
-    models_dict = {
-              baseline+"_"+mode : (baseline_preds, baseline_scores)}
-    return get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test)
+       # Metrics
+      models_dict = {
+                baseline+"_"+mode : (baseline_preds, baseline_preds)}
+      metrics = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test)
+      # Since fair logloss uses expected violation, we use metrics from their code
+      metrics[baseline+"_"+mode]['ZeroOne'] = exp_zeroone
+      if mode == "demographic_parity":
+        metrics[baseline+"_"+mode]['Demographic parity difference'] = violation
+      elif mode == "equalized_odds":
+        metrics[baseline+"_"+mode]['Equalized odds difference'] = violation
+
+      return metrics     
+  def compute_error(self, Yhat,proba,Y):
+    err = 1 - np.sum(Yhat == Y) / Y.shape[0] 
+    exp_zeroone = np.mean(np.where(Y == 1 , 1 - proba, proba))
+    return err, exp_zeroone
     
 
 
 
   def eval_model(self, mode):
     if mode == "train":
-      #train_file_path = os.path.join(self.train_data_path, f"train_data_{dataset}.csv")
       train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
       train_file_path = os.path.join(self.train_data_path, train_data_filename)
 
-      self.train_data = pd.read_csv(train_file_path, index_col=0)#.drop(columns=['prev_index'])
+      self.train_data = pd.read_csv(train_file_path, index_col=0)
       A = self.train_data[self.sensitive_feature]
       A_str = A.map(self.dict_map)
       # Extract the target
-      Y = self.train_data[self.label]
+      Y_train = self.train_data[self.label]
+      Y_test = Y_train
       X = self.train_data.drop(columns=[self.label])
     elif mode == "test-sh" or mode == "test-pp":
-      #test_file_path = os.path.join(self.test_data_path, f"test_data_{dataset}.csv")
+      # read train data: we need Y_train to predict test data
+      train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
+      train_file_path = os.path.join(self.train_data_path, train_data_filename)
+      self.train_data = pd.read_csv(train_file_path, index_col=0)
+      Y_train = self.train_data[self.label]
+      ## read test data
       test_data_filename = "test_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
       test_file_path = os.path.join(self.test_data_path, test_data_filename)
-
-      self.test_data = pd.read_csv(test_file_path, index_col=0)#.drop(columns=['prev_index'])
+      self.test_data = pd.read_csv(test_file_path, index_col=0)
       A = self.test_data[self.sensitive_feature]
       A_str = A.map(self.dict_map)
-      # Extract the target
-      Y = self.test_data[self.label]
+      Y_test = self.test_data[self.label]
       X = self.test_data.drop(columns=[self.label])
 
     # Scores on train set
@@ -821,12 +873,12 @@ class Super_human:
     # Train AUC
     #roc_auc_score(Y_train, self.model_obj.predict_proba(X_train)[:, 1])
     # Predictions (0 or 1) on test set
-    preds = (scores >= np.mean(Y)) * 1
+    preds = (scores >= np.mean(Y_train)) * 1
     # Metrics
     eval = pd.DataFrame(index = [self.feature[i] for i in range(self.num_of_features)]) #['Demographic parity difference', 'False negative rate difference', 'ZeroOne']
     models_dict = {
               "Super_human": (preds, preds)}
-    eval = get_metrics_df(models_dict = models_dict, y_true = Y, group = A_str)
+    eval = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str)
     return eval
 
   def get_model_thetha(self):
@@ -844,7 +896,8 @@ class Super_human:
 
   def update_model(self, lr_theta, iters):
     self.lr_theta = lr_theta
-    self.grad_theta, subdom_tensor_sum_arr, self.eval = [], [], []
+    self.grad_theta, subdom_tensor_sum_arr, self.eval, self.gamma_superhuman_arr = [], [], [], []
+    gamma_degrade = 0
     for i in tqdm(range(iters)):
       # find sample loss and store it, we will use it for computing grad_theta and grad_alpha
       self.sample_superhuman() # update self.sample_matrix with new samples from new theta
@@ -874,7 +927,22 @@ class Super_human:
       self.grad_theta.append(grad_theta)
       subdom_tensor_sum_arr.append(subdom_tensor_sum)
       self.eval.append(eval_i)
-      self.model_params = {"model":self.model_obj, "theta": self.model_obj.coef_, "alpha":self.alpha, "eval": self.eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features, "demo_baseline": self.demo_baseline}
+      model_params = {"model":self.model_obj, "theta": self.model_obj.coef_, "alpha":self.alpha, "eval": self.eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features, "demo_baseline": self.demo_baseline}
+      gamma_superhuman = find_gamma_superhuman(self.demo_list, model_params)
+      self.gamma_superhuman_arr.append(gamma_superhuman)
+      print("gamma_superhuman: ")
+      print(sum(gamma_superhuman))
+      if (sum(self.gamma_superhuman) == self.num_of_features and sum(gamma_superhuman) < self.num_of_features): # if last iter every feature was 1-superhuman and this iter changes --> break
+        break
+      if len(self.gamma_superhuman_arr) > 10 and sum(gamma_superhuman) < sum(self.gamma_superhuman_arr[-2]):  # look back if it has improved for the last 3 iterations, if not --> break
+        gamma_degrade += 1
+      else:
+        gamma_degrade = 0
+      if gamma_degrade == 3: # peformance degrades for 3 cosecutive iterations.
+        break
+      self.model_params = model_params
+
+      
     #model_params = {"model":self.model_obj, "theta": self.model_obj.coef_, "alpha":self.alpha, "eval": self.eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features}
     experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     file_dir = os.path.join(self.train_data_path)
@@ -910,6 +978,8 @@ class Super_human:
     print(eval_sh)
     print()
     print(eval_pp_dp)
+    print()
+    print(eval_pp_eqodds)
     print()
     print(eval_fairll_dp)
     print()
