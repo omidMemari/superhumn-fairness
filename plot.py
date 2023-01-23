@@ -66,6 +66,9 @@ def plot_features(noise, dataset, noise_ratio):
             y_fairll_eq_odds = model_params['eval_fairll_eqodds'].loc[feature[i]][0]
             x_fairll_eq_opp = model_params['eval_fairll_eqopp'].loc[feature[j]][0]
             y_fairll_eq_opp = model_params['eval_fairll_eqopp'].loc[feature[i]][0]
+            ### MFOpt
+            x_mfopt = model_params['eval_MFOpt'].loc[feature[j]][0]
+            y_mfopt = model_params['eval_MFOpt'].loc[feature[i]][0]
             
 
             newX = x + alpha[j]
@@ -76,16 +79,20 @@ def plot_features(noise, dataset, noise_ratio):
             # xLeft is (xlim - x)*0.8 + x
             plt.xlabel(name[j]) #plt.xlabel(feature[j])
             plt.ylabel(name[i]) #plt.ylabel(feature[i])
-            plt.scatter(demo_metric_j, demo_metric_i, marker='*', c=[(255/255,211/255,107/255)], label = 'post_proc_demos')
+            
+            plt.plot(x_test, y_test, 'Xk', label = 'superhuman_test')
             plt.plot(x, y, 'ro', label = 'superhuman_train')
-            plt.plot(x_test, y_test, marker='X', color='black', label = 'superhuman_test')
+            plt.scatter(demo_metric_j, demo_metric_i, marker='*', c=[(255/255,211/255,107/255)], label = 'post_proc_demos')
+            # plot MFOpt
+            plt.plot(x_mfopt, y_mfopt, 'hm', label = 'MFOpt')
             # plot post-processing
             plt.plot(x_pp_dp, y_pp_dp, 'bo', label = 'post_proc_dp')
             plt.plot(x_pp_eq_odds, y_pp_eq_odds, 'go', label = 'post_proc_eqodds')
             # plot fair log-loss
-            plt.plot(x_fairll_dp, y_fairll_dp, marker='P', color='cyan', label = 'fair_logloss_dp')
+            plt.plot(x_fairll_dp, y_fairll_dp, marker='P', color='darkcyan', label = 'fair_logloss_dp')
             plt.plot(x_fairll_eq_odds, y_fairll_eq_odds, marker='P', color='indigo', label = 'fair_logloss_eqodds')
             #plt.plot(x_fairll_dp, y_fairll_eq_opp, marker='P', color='cyan', label = 'fair_logloss_eqopp')
+            
             xmin, xmax, ymin, ymax = plt.axis()
             
             # plt.plot([x, x], [y, 0.95*ymax], 'r')
