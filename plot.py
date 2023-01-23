@@ -82,7 +82,8 @@ def plot_features(noise, dataset, noise_ratio):
             
             plt.plot(x_test, y_test, 'Xk', label = 'superhuman_test')
             plt.plot(x, y, 'ro', label = 'superhuman_train')
-            plt.scatter(demo_metric_j, demo_metric_i, marker='*', c=[(255/255,211/255,107/255)], label = 'post_proc_demos')
+            #plt.scatter(demo_metric_j, demo_metric_i, marker='*', c=[(255/255,211/255,107/255)], label = 'post_proc_demos')
+            plt.scatter(demo_metric_j, demo_metric_i, marker='*', c='orange', label = 'post_proc_demos')
             # plot MFOpt
             plt.plot(x_mfopt, y_mfopt, 'hm', label = 'MFOpt')
             # plot post-processing
