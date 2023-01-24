@@ -732,7 +732,7 @@ class Super_human:
       demo = self.data_demo(X_train, X_train, Y_train, Y_train, A_train, A_train, A_str_train, A_str_train, X_train.index, X_train.index)
       demo = self.add_noise_new(demo) # in this function we only add noise to train_Y and test_A: so instead of test_A we use train_A in the input
       Y_train, A_train = demo.train_y, demo.test_A 
-      self.save_AXY(A_train, X_train, Y_train, A_test, X_test, Y_test)
+      self.save_AXY(A_train - 1, X_train, Y_train, A_test - 1, X_test, Y_test)
       #X_test, Y_test, A_test, A_str_test = demo.test_x, demo.test_y, demo.test_A, demo.test_A_str
 
     
