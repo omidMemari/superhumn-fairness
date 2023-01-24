@@ -46,14 +46,14 @@ feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds 
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}}
-lr_theta = 0.03
+lr_theta = 0.001
 iters = 30
 num_of_demos = 50
 num_of_features = 4
 alpha = 0.5
 beta = 0.5
 lamda = 0.01
-demo_baseline = "pp"#"fair_logloss"
+demo_baseline = "fair_logloss" #"pp"
 model = "logistic_regression"
 noise_ratio = 0.2
 noise_list = [0.2]#0.03, 0.04]#[0.06, 0.07, 0.08, 0.09]##[0.16, 0.17, 0.18, 0.19, 0.20]#[0.11, 0.12, 0.13, 0.14, 0.15]#########
@@ -939,7 +939,7 @@ class Super_human:
     eval_fairll_dp = self.eval_model_baseline(baseline = "fair_logloss", mode = "demographic_parity")
     eval_fairll_eqodds = self.eval_model_baseline(baseline = "fair_logloss", mode = "equalized_odds")
     eval_fairll_eqopp = self.eval_model_baseline(baseline = "fair_logloss", mode = "equalized_opportunity")
-    eval_MFOpt = self.eval_model_baseline(baseline = "MFOpt")
+    #eval_MFOpt = self.eval_model_baseline(baseline = "MFOpt")
     print()
     print(eval_sh)
     print()
@@ -953,14 +953,14 @@ class Super_human:
     print()
     print(eval_fairll_eqodds)
     print()
-    print(eval_MFOpt)
+    #print(eval_MFOpt)
     self.model_params["eval_sh"]= eval_sh
     self.model_params["eval_pp_dp"]= eval_pp_dp
     self.model_params["eval_pp_eq_odds"] = eval_pp_eqodds
     self.model_params["eval_fairll_dp"] = eval_fairll_dp
     self.model_params["eval_fairll_eqodds"] = eval_fairll_eqodds
     self.model_params["eval_fairll_eqopp"] = eval_fairll_eqopp
-    self.model_params["eval_MFOpt"]= eval_MFOpt
+    #self.model_params["eval_MFOpt"]= eval_MFOpt
     experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     file_dir = os.path.join(self.test_data_path)
     store_object(self.model_params, file_dir, experiment_filename)
