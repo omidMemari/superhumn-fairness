@@ -43,17 +43,17 @@ from fair_logloss.fair_logloss import DP_fair_logloss_classifier, EOPP_fair_logl
 
 #feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference", 5: "Positive predictive value difference", 6: "Negative predictive value difference", 7: "Predictive value difference"}
 feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds difference", 3: "Predictive value difference"}
-label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid'}
-protected_dict = {'Adult': 'gender', 'COMPAS':'race'}
-protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}}
-lr_theta = 0.001
+label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label'}
+protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender'}
+protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, 'Diabetes': {"AfricanAmerican":2, "Caucasian":1}}
+lr_theta = 0.03
 iters = 30
 num_of_demos = 50
 num_of_features = 4
 alpha = 0.5
 beta = 0.5
 lamda = 0.01
-demo_baseline = "fair_logloss" #"pp"
+demo_baseline = "pp" #"fair_logloss"
 model = "logistic_regression"
 noise_ratio = 0.2
 noise_list = [0.2]#0.03, 0.04]#[0.06, 0.07, 0.08, 0.09]##[0.16, 0.17, 0.18, 0.19, 0.20]#[0.11, 0.12, 0.13, 0.14, 0.15]#########
@@ -403,6 +403,43 @@ class Super_human:
     demo_list_filename = make_demo_list_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     store_object(self.demo_list, file_dir, demo_list_filename)
 
+  def save_AXY(self, A_train, X_train, Y_train, A_test, X_test, Y_test):
+    # A_train = train[self.sensitive_feature]
+    # A_str_train = A_train.map(self.dict_map)
+    # Y_train = train[self.label]
+    # idx_train = train.index.tolist()
+    # X_train = train.drop(columns=[self.label])
+    # if self.noise == True:
+    #   demo = self.data_demo(X_train, X_train, Y_train, Y_test, A_train, A_train, A_str_train, A_str_train, idx_train, idx_train)
+    #   noisy_demo = self.add_noise_new(demo)
+    #   A_train = noisy_demo.test_A
+    #   Y_train = noisy_demo.train_y
+    #   A_str_train = noisy_demo.test_A_str
+
+    # A_test = test[self.sensitive_feature]
+    # A_str_test = A_test.map(self.dict_map)
+    # Y_test = test[self.label]
+    # idx_test = test.index.tolist()
+    # X_test = test.drop(columns=[self.label])
+
+    #train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
+    #train_file_path = os.path.join(self.train_data_path, train_data_filename)
+
+    A_train.to_csv(os.path.join("dataset", self.dataset, 'A_train.csv'),  sep='\t')
+    X_train.to_csv(os.path.join("dataset", self.dataset, 'X_train.csv'),  sep='\t')
+    Y_train.to_csv(os.path.join("dataset", self.dataset, 'Y_train.csv'),  sep='\t')
+
+    A_test.to_csv(os.path.join("dataset", self.dataset, 'A_test.csv'),  sep='\t')
+    X_test.to_csv(os.path.join("dataset", self.dataset, 'X_test.csv'),  sep='\t')
+    Y_test.to_csv(os.path.join("dataset", self.dataset, 'Y_test.csv'),  sep='\t')
+    
+
+
+
+    
+
+    
+
 
   def add_noise(self, data, protected=False):
     if protected:
@@ -417,7 +454,7 @@ class Super_human:
     noisy_Y = copy.deepcopy(Y)
     idx = np.random.permutation(range(n))[:int(self.noise_ratio*n)]
     #print(idx)
-    if protected==True and self.dataset == 'Adult': # checked! works well!
+    if protected==True and (self.dataset == 'Adult' or dataset == 'Diabetes'): # checked! works well!
       # Y[idx] = Y[idx] - 1   # change 1,2 to 0,1
       # noisy_Y[idx] = 1-Y[idx] # change 0,1 to 1,0
       # noisy_Y[idx] = noisy_Y[idx] + 1   # revert 1,0 to 2,1
@@ -690,6 +727,17 @@ class Super_human:
     Y_test = self.test_data[self.label]
     X_train = self.train_data.drop(columns=[self.label])
     X_test = self.test_data.drop(columns=[self.label])
+    ### Add noise
+    if self.noise == True:
+      demo = self.data_demo(X_train, X_train, Y_train, Y_train, A_train, A_train, A_str_train, A_str_train, X_train.index, X_train.index)
+      demo = self.add_noise_new(demo) # in this function we only add noise to train_Y and test_A: so instead of test_A we use train_A in the input
+      Y_train, A_train = demo.train_y, demo.test_A 
+      self.save_AXY(A_train, X_train, Y_train, A_test, X_test, Y_test)
+      #X_test, Y_test, A_test, A_str_test = demo.test_x, demo.test_y, demo.test_A, demo.test_A_str
+
+    
+
+
 
     if baseline == "pp":
 
@@ -734,7 +782,7 @@ class Super_human:
       # Y_test = Y_test.astype('float64')
       # A_train = A_train.astype('float64')
       # A_test = A_test.astype('float64')
-      if dataset == 'Adult':
+      if dataset == 'Adult' or dataset == 'Diabetes':
         A_train = A_train - 1
         A_test = A_test - 1
 
