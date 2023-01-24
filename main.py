@@ -47,7 +47,7 @@ label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}}
 lr_theta = 0.03
-iters = 8
+iters = 30
 num_of_demos = 50
 num_of_features = 4
 alpha = 0.5
@@ -280,10 +280,10 @@ class Super_human:
     
 
     ################################################################
-    if self.noise == True:
-        baseline_preds = self.add_noise(baseline_preds, protected=False) # add noise to the predicted label
-        #A_test_noisy = self.add_noise(A_test, protected=True)    # add noise to the protected attribute
-        #Y_test_noisy = self.add_noise(Y_test, protected=False)
+    # if self.noise == True:
+    #     baseline_preds = self.add_noise(baseline_preds, protected=False) # add noise to the predicted label
+    #     A_test_noisy = self.add_noise(A_test, protected=True)    # add noise to the protected attribute
+    #     #Y_test_noisy = self.add_noise(Y_test, protected=False)
     # Metrics
     models_dict = {
               self.demo_baseline : (baseline_preds, baseline_preds)} 
@@ -383,10 +383,11 @@ class Super_human:
       dataset_temp['prev_index'] = index_list
       ##########################################################################
       new_demo = self.split_data(model, alpha=beta, dataset=dataset_temp,  mode="post-processing")
-      # if self.noise == True:
-      #   new_demo = self.add_noise_new(new_demo)
+      if self.noise == True:
+        new_demo = self.add_noise_new(new_demo)
       
       metrics = self.run_demo_baseline(data_demo = new_demo) #self.run_logistic_pp(model = model, data_demo = new_demo)
+      #if self.noise == True and metrics[self.demo_baseline]["Demographic parity difference"]
       print("demo metrics: ")
       print(metrics)
       print("-----------------------------------")
@@ -437,104 +438,39 @@ class Super_human:
   def add_noise_new(self, data_demo):  # works fine!
 
     Y_train = data_demo.train_y
-    Y_test = data_demo.test_y
     A_str_test = data_demo.test_A_str
     A_test = data_demo.test_A
-
-    A_str_train = data_demo.train_A_str
-    A_train = data_demo.train_A
-
 
     n_Y = len(Y_train)
     n_A = len(A_test)
 
-    n_A2 = len(A_train)
-
-    #Y_train_1 = Y_train.loc[Y_train == 1]
-    #Y_train_0 = Y_train.loc[Y_train == 0]
-
-    #n_Y_1 = len(Y_train_1)
-    #n_Y_0 = len(Y_train_0)
-
-    #idx_Y_1 = np.random.permutation(range(n_Y_1))[:int(self.noise_ratio*n_Y/2)]
-    #idx_Y_0 = np.random.permutation(range(n_Y_0))[:int(self.noise_ratio*n_Y/2)]
-
     idx_Y = np.random.permutation(range(n_Y))[:int(self.noise_ratio*n_Y)]
     idx_A = np.random.permutation(range(n_A))[:int(self.noise_ratio*n_A)]
 
-    idx_A2 = np.random.permutation(range(n_A2))[:int(self.noise_ratio*n_A2)]
-
-    #Y_train_1_index = Y_train_1.index
-    #Y_train_0_index = Y_train_0.index
-
-    A_train_index = A_train.index
-
     A_test_index = A_test.index
     Y_train_index = Y_train.index
-    Y_test_index = Y_test.index
-
-    #Y_train_1 = Y_train_1.reset_index(drop=True)
-    #Y_train_0 = Y_train_0.reset_index(drop=True)
-
-    A_train = A_train.reset_index(drop=True)
 
     A_test = A_test.reset_index(drop=True)
     Y_train = Y_train.reset_index(drop=True)
-    Y_test = Y_test.reset_index(drop=True)
-
-    #noisy_Y_train_1 = copy.deepcopy(Y_train_1)
-    #noisy_Y_train_0 = copy.deepcopy(Y_train_0)
-
-    noisy_A_train = copy.deepcopy(A_train)
 
     noisy_A_test = copy.deepcopy(A_test)
     noisy_Y_train = copy.deepcopy(Y_train)
-    noisy_Y_test = copy.deepcopy(Y_test)
-
-    A_train.loc[idx_A2] = A_train.loc[idx_A2] - 1   # change 1,2 to 0,1
-    noisy_A_train.loc[idx_A2] = 1 - A_train.loc[idx_A2] # change 0,1 to 1,0
-    noisy_A_train.loc[idx_A2] = noisy_A_train.loc[idx_A2] + 1   # revert 1,0 to 2,1
-    
-
     # flip protected attribute
     A_test.loc[idx_A] = A_test.loc[idx_A] - 1   # change 1,2 to 0,1
     noisy_A_test.loc[idx_A] = 1 - A_test.loc[idx_A] # change 0,1 to 1,0
     noisy_A_test.loc[idx_A] = noisy_A_test.loc[idx_A] + 1   # revert 1,0 to 2,1
-
-
-    
-    
     # flip label
-
-    #noisy_Y_train_1.loc[idx_Y_1] = 1 - Y_train_1.loc[idx_Y_1]
-    #noisy_Y_train_0.loc[idx_Y_0] = 1 - Y_train_0.loc[idx_Y_0]
-
     noisy_Y_train.loc[idx_Y] = 1 - Y_train.loc[idx_Y] # if adding noise to the label
-    #noisy_Y_test.loc[idx_Y2] = 1 - Y_test.loc[idx_Y2] # if adding noise to the label
-
-
-    #noisy_Y_train_1.index = Y_train_1_index
-    #noisy_Y_train_0.index = Y_train_0_index
-
-    noisy_A_train.index = A_train_index
-    noisy_A_train_str = noisy_A_train.map(self.dict_map)
-    noisy_A_train_str.index = A_train_index
-    data_demo.train_A = noisy_A_train
-    data_demo.train_A_str = noisy_A_train_str
-
-
 
     noisy_A_test.index = A_test_index
     noisy_Y_train.index = Y_train_index
-    #noisy_Y_test.index = Y_test_index
     noisy_A_test_str = noisy_A_test.map(self.dict_map)
     noisy_A_test_str.index = A_test_index
     
     data_demo.test_A = noisy_A_test
     data_demo.test_A_str = noisy_A_test_str
     data_demo.train_y = noisy_Y_train
-    #data_demo.train_y = pd.concat([noisy_Y_train_1, noisy_Y_train_0], axis=0)
-  
+
     return data_demo
 
   
