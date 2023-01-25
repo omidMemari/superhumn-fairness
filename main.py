@@ -46,14 +46,14 @@ feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds 
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, 'Diabetes': {2:"Female", 1:"Male"}}
-lr_theta = 0.03
+lr_theta = 0.001
 iters = 10
 num_of_demos = 50
 num_of_features = 4
 alpha = 0.5
 beta = 0.5
 lamda = 0.01
-demo_baseline = "pp" #"fair_logloss" #
+demo_baseline = "fair_logloss" #"pp"
 model = "logistic_regression"
 noise_ratio = 0.2
 noise_list = [0.2]#0.03, 0.04]#[0.06, 0.07, 0.08, 0.09]##[0.16, 0.17, 0.18, 0.19, 0.20]#[0.11, 0.12, 0.13, 0.14, 0.15]#########
@@ -734,8 +734,11 @@ class Super_human:
     if self.noise == True:
       demo = self.data_demo(X_train, X_train, Y_train, Y_train, A_train, A_train, A_str_train, A_str_train, X_train.index, X_train.index)
       demo = self.add_noise_new(demo) # in this function we only add noise to train_Y and test_A: so instead of test_A we use train_A in the input
-      Y_train, A_train = demo.train_y, demo.test_A 
-      self.save_AXY(A_train - 1, X_train, Y_train, A_test - 1, X_test, Y_test)
+      Y_train, A_train = demo.train_y, demo.test_A
+      if self.dataset == 'Adult': 
+        self.save_AXY(A_train - 1, X_train, Y_train, A_test - 1, X_test, Y_test)
+      elif self.dataset == 'COMPAS':
+        self.save_AXY(A_train, X_train, Y_train, A_test, X_test, Y_test)
       #X_test, Y_test, A_test, A_str_test = demo.test_x, demo.test_y, demo.test_A, demo.test_A_str
 
     
