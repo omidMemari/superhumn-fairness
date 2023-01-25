@@ -5,6 +5,9 @@ import os
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.pipeline import Pipeline
 from sklearn_pandas import DataFrameMapper
+import random
+from sklearn.utils import shuffle
+
 
 #data_path = Path(f"{os.getcwd()}/data")
 
@@ -90,10 +93,14 @@ def main():
     for col_name in categorical_features:
         df[col_name] = df[col_name].astype("category")
     
+    df = df.dropna()
+    
     # drop gender group Unknown/Invalid
     #preprocessed_df = df.query("gender != 'Unknown/Invalid'")
     
-    df = df[df.gender != 'Unknown/Invalid']
+    #df = df[df.gender != 'Unknown/Invalid']
+    df.drop(df.loc[df['gender']=='Unknown/Invalid'].index, inplace=True)
+    #df = df.drop(df['gender'] == 'Unknown/Invalid')
     print(df["gender"].value_counts())
     print(df)
     # retain the original race as race_all, and merge Asian+Hispanic+Other 
@@ -103,6 +110,7 @@ def main():
     demographic = ["race", "gender"]
     sensitive = ["gender"]
     #Y, A = df.loc[:, target_variable], df.loc[:, sensitive]
+    print(df.dtypes)
     Y, A = df[[target_variable]], df[sensitive]
 
     df = pd.get_dummies(df.drop(columns=[
@@ -112,7 +120,11 @@ def main():
         "readmit_binary",
         "readmit_30_days"  # "readmit_30_days" is the label, "race" or "gender" --> protected attribute
     ]))
-
+    df = df.astype(float)
+    Y = Y.astype(float)
+    print(A.dtypes)
+    A = A.replace({"Female":2, "Male":1})
+    A = A.astype(float)
     # from sklearn.preprocessing import StandardScaler, OneHotEncoder, LabelEncoder
     # from sklearn.compose import ColumnTransformer, make_column_transformer
     # preprocess = make_column_transformer(
@@ -164,7 +176,28 @@ def main():
     # Concatenate (Column-Bind) Processed Columns Back Together
     #final_df = np.concatenate([scaled_columns, encoded_columns], axis=1)
 
-    final_df.to_csv("dataset_ref.csv", index=False)
+    # Balanced data set is obtained by sampling the same number of points from the majority class (Y=0)
+    # as there are points in the minority class (Y=1)
+    print(final_df["label"].value_counts())
+
+
+    # balanced_idx1 = final_df[Y['label']==1].index
+    # pp_train_idx = balanced_idx1.union(Y[Y['label']==0].sample(n=balanced_idx1.size, random_state=1234).index)
+    # final_df_balanced = final_df.loc[pp_train_idx, :]
+    final_df_1 = final_df[final_df['label']==1]
+    print(final_df_1)
+    final_df_balanced = pd.concat([final_df, final_df_1, final_df_1, final_df_1, final_df_1, final_df_1, final_df_1, final_df_1, final_df_1], axis=0)
+    print(final_df_balanced)
+
+
+
+    
+    print(final_df_balanced["label"].value_counts())
+    r = random.randint(0, 10000000)
+    final_df_balanced = shuffle(final_df_balanced, random_state=r)
+    final_df_balanced.to_csv("dataset_ref.csv", index=False)
+    
+    print(final_df_balanced)
 
 if __name__ == "__main__":
     main()
