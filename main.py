@@ -47,7 +47,7 @@ label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, 'Diabetes': {2:"Female", 1:"Male"}}
 lr_theta = 0.001
-iters = 10
+iters = 5
 num_of_demos = 50
 num_of_features = 4
 alpha = 0.5
@@ -167,6 +167,8 @@ class Super_human:
     # Extract the target
     Y = self.train_data[self.label]
     X = self.train_data.drop(columns=[self.label])
+
+    
     
     X_train, X_test, Y_train, Y_test, A_train, A_test, A_str_train, A_str_test = train_test_split(
         X,
@@ -177,7 +179,14 @@ class Super_human:
         random_state=12345,
         stratify=Y
         )
-    
+    ###############################################
+    balanced_idx1 = X_train[Y_train==1].index
+    pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
+    X_train = X_train.loc[pp_train_idx, :]
+    Y_train = Y_train.loc[pp_train_idx]
+    A_train = A_train.loc[pp_train_idx]
+    #################################################
+
     self.model_obj = LogisticRegression(**self.logi_params)
     self.model_obj.fit(X_train, Y_train)
     self.pred_scores = self.model_obj.predict_proba(X_test)
@@ -251,7 +260,7 @@ class Super_human:
       baseline_preds = self.postprocess_est.predict(X_test, sensitive_features=A_test)
 
     elif self.demo_baseline == "fair_logloss":
-      mode = 'equalized_opportunity' #'equalized_odds'
+      mode = 'demographic_parity' #'equalized_opportunity' #'equalized_odds'
       C = .005
       if mode == 'demographic_parity':
         h = DP_fair_logloss_classifier(C=C, random_initialization=True, verbose=False)
@@ -496,9 +505,12 @@ class Super_human:
     noisy_A_test = copy.deepcopy(A_test)
     noisy_Y_train = copy.deepcopy(Y_train)
     # flip protected attribute
-    A_test.loc[idx_A] = A_test.loc[idx_A] - 1   # change 1,2 to 0,1
-    noisy_A_test.loc[idx_A] = 1 - A_test.loc[idx_A] # change 0,1 to 1,0
-    noisy_A_test.loc[idx_A] = noisy_A_test.loc[idx_A] + 1   # revert 1,0 to 2,1
+    if self.dataset == 'Adult':
+      A_test.loc[idx_A] = A_test.loc[idx_A] - 1   # change 1,2 to 0,1
+      noisy_A_test.loc[idx_A] = 1 - A_test.loc[idx_A] # change 0,1 to 1,0
+      noisy_A_test.loc[idx_A] = noisy_A_test.loc[idx_A] + 1   # revert 1,0 to 2,1
+    elif self.dataset == 'COMPAS':
+      noisy_A_test.loc[idx_A] = 1 - A_test.loc[idx_A] # change 0,1 to 1,0
     # flip label
     noisy_Y_train.loc[idx_Y] = 1 - Y_train.loc[idx_Y] # if adding noise to the label
 
