@@ -45,15 +45,15 @@ from fair_logloss.fair_logloss import DP_fair_logloss_classifier, EOPP_fair_logl
 feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds difference", 3: "Predictive value difference"}
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender'}
-protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, 'Diabetes': {"AfricanAmerican":2, "Caucasian":1}}
+protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, 'Diabetes': {2:"Female", 1:"Male"}}
 lr_theta = 0.03
-iters = 30
+iters = 10
 num_of_demos = 50
 num_of_features = 4
 alpha = 0.5
 beta = 0.5
 lamda = 0.01
-demo_baseline = "pp" #"fair_logloss"
+demo_baseline = "pp" #"fair_logloss" #
 model = "logistic_regression"
 noise_ratio = 0.2
 noise_list = [0.2]#0.03, 0.04]#[0.06, 0.07, 0.08, 0.09]##[0.16, 0.17, 0.18, 0.19, 0.20]#[0.11, 0.12, 0.13, 0.14, 0.15]#########
@@ -238,14 +238,15 @@ class Super_human:
           prefit=True)
       # Balanced data set is obtained by sampling the same number of points from the majority class (Y=0)
       # as there are points in the minority class (Y=1)
-      balanced_idx1 = X_train[Y_train==1].index
-      pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
-      X_train_balanced = X_train.loc[pp_train_idx, :]
-      Y_train_balanced = Y_train.loc[pp_train_idx]
-      A_train_balanced = A_train.loc[pp_train_idx]
+      if self.dataset != 'Diabetes':
+        balanced_idx1 = X_train[Y_train==1].index
+        pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
+        X_train = X_train.loc[pp_train_idx, :]
+        Y_train = Y_train.loc[pp_train_idx]
+        A_train = A_train.loc[pp_train_idx]
 
       # Post-process fitting
-      self.postprocess_est.fit(X_train_balanced, Y_train_balanced, sensitive_features=A_train_balanced)
+      self.postprocess_est.fit(X_train, Y_train, sensitive_features=A_train)
       # Post-process preds
       baseline_preds = self.postprocess_est.predict(X_test, sensitive_features=A_test)
 
@@ -360,8 +361,9 @@ class Super_human:
         random_state=12345,
         stratify=Y
         )
-    dataset_pp = dataset_ref.loc[idx_train].reset_index(drop=True) # use only pp portion of the data and leave SH Test portion
-    dataset_sh = dataset_ref.loc[idx_test].reset_index(drop=True)
+    dataset_pp = dataset_ref.iloc[idx_train].reset_index(drop=True) # use only pp portion of the data and leave SH Test portion
+    dataset_sh = dataset_ref.iloc[idx_test].reset_index(drop=True)
+
     
     train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
@@ -373,6 +375,7 @@ class Super_human:
     dataset_sh.to_csv(test_file_path)
     
     dataset_pp_copy = dataset_pp.copy(deep=True)
+
    
     
     for i in range(self.num_of_demos):
@@ -657,7 +660,7 @@ class Super_human:
       #print("demo_loss, sample_loss: ")
       #print(sorted_demos)
       sorted_demos = np.array(sorted_demos)
-      alpha[k] = 100 #max(self.alpha) #np.mean(self.alpha) # default value in case it didn't change using previous alpha values
+      alpha[k] = np.mean(self.alpha) #100 #max(self.alpha) #np.mean(self.alpha) # default value in case it didn't change using previous alpha values
       # print("alpha {}", k)
       # print(alpha)
       for m, demo in enumerate(sorted_demos):
@@ -820,6 +823,8 @@ class Super_human:
     
     elif baseline == "MFOpt":
       test_data_filename = "MFOpt_" + dataset + ".csv"
+      if self.noise == True: 
+        test_data_filename = "MFOpt_" + dataset +"_0-2"+ ".csv"
       test_file_path = os.path.join(self.test_data_path, test_data_filename)
       #self.train_data = pd.read_csv(train_file_path, index_col=0)
       self.test_data = pd.read_csv(test_file_path, index_col=0)
@@ -987,7 +992,7 @@ class Super_human:
     eval_fairll_dp = self.eval_model_baseline(baseline = "fair_logloss", mode = "demographic_parity")
     eval_fairll_eqodds = self.eval_model_baseline(baseline = "fair_logloss", mode = "equalized_odds")
     eval_fairll_eqopp = self.eval_model_baseline(baseline = "fair_logloss", mode = "equalized_opportunity")
-    #eval_MFOpt = self.eval_model_baseline(baseline = "MFOpt")
+    eval_MFOpt = self.eval_model_baseline(baseline = "MFOpt")
     print()
     print(eval_sh)
     print()
@@ -1001,14 +1006,14 @@ class Super_human:
     print()
     print(eval_fairll_eqodds)
     print()
-    #print(eval_MFOpt)
+    print(eval_MFOpt)
     self.model_params["eval_sh"]= eval_sh
     self.model_params["eval_pp_dp"]= eval_pp_dp
     self.model_params["eval_pp_eq_odds"] = eval_pp_eqodds
     self.model_params["eval_fairll_dp"] = eval_fairll_dp
     self.model_params["eval_fairll_eqodds"] = eval_fairll_eqodds
     self.model_params["eval_fairll_eqopp"] = eval_fairll_eqopp
-    #self.model_params["eval_MFOpt"]= eval_MFOpt
+    self.model_params["eval_MFOpt"]= eval_MFOpt
     experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     file_dir = os.path.join(self.test_data_path)
     store_object(self.model_params, file_dir, experiment_filename)

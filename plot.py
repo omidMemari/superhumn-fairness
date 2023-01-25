@@ -18,7 +18,7 @@ short = {"ZeroOne": "error", "Demographic parity difference": "DP", "D.FNR": "FN
 lr_theta = 0.03
 num_of_demos = 50
 num_of_features = 4
-demo_baseline =  "pp" #"fair_logloss" #"pp"
+demo_baseline =  "pp" #"fair_logloss"
 noise_ratio = 0.2
 noise_list = [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]#, 0.09, 0.10]#, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20]
 
@@ -67,8 +67,8 @@ def plot_features(noise, dataset, noise_ratio):
             x_fairll_eq_opp = model_params['eval_fairll_eqopp'].loc[feature[j]][0]
             y_fairll_eq_opp = model_params['eval_fairll_eqopp'].loc[feature[i]][0]
             ### MFOpt
-            #x_mfopt = model_params['eval_MFOpt'].loc[feature[j]][0]
-            #y_mfopt = model_params['eval_MFOpt'].loc[feature[i]][0]
+            x_mfopt = model_params['eval_MFOpt'].loc[feature[j]][0]
+            y_mfopt = model_params['eval_MFOpt'].loc[feature[i]][0]
             
 
             newX = x + alpha[j]
@@ -85,7 +85,7 @@ def plot_features(noise, dataset, noise_ratio):
             #plt.scatter(demo_metric_j, demo_metric_i, marker='*', c=[(255/255,211/255,107/255)], label = 'post_proc_demos')
             plt.scatter(demo_metric_j, demo_metric_i, marker='*', c='orange', label = 'post_proc_demos')
             # plot MFOpt
-            #plt.plot(x_mfopt, y_mfopt, 'hm', label = 'MFOpt')
+            plt.plot(x_mfopt, y_mfopt, 'hm', label = 'MFOpt')
             # plot post-processing
             plt.plot(x_pp_dp, y_pp_dp, 'bo', label = 'post_proc_dp')
             plt.plot(x_pp_eq_odds, y_pp_eq_odds, 'go', label = 'post_proc_eqodds')
