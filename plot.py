@@ -15,10 +15,10 @@ colors = {0:'orange', 1: 'red', 2: 'blue', 3:'green', 4:'black'}
 feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds difference", 3: "Predictive value difference"}
 name = {0: "Prediction error", 1: "D.DP", 2: "D.EqOdds", 3: "D.PRP"}
 short = {"ZeroOne": "error", "Demographic parity difference": "DP", "D.FNR": "FNR", "D.FPR": "FPR", "Equalized odds difference": "EqOdds", "D.PPV": "PPV", "D.NPV":"NPV", "Predictive value difference":"PRP"}
-lr_theta = 0.03
+lr_theta = 0.001
 num_of_demos = 50
-num_of_features = 4
-demo_baseline =  "pp" #"fair_logloss"
+num_of_features = 2
+demo_baseline =  "fair_logloss" #"pp"
 noise_ratio = 0.2
 noise_list = [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]#, 0.09, 0.10]#, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20]
 
