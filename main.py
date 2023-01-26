@@ -47,7 +47,7 @@ label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, 'Diabetes': {2:"Female", 1:"Male"}}
 lr_theta = 0.0001
-iters = 5
+iters = 30
 num_of_demos = 50
 num_of_features = 4
 alpha = 0.5
@@ -734,7 +734,7 @@ class Super_human:
       #print("demo_loss, sample_loss: ")
       #print(sorted_demos)
       sorted_demos = np.array(sorted_demos)
-      alpha[k] = np.mean(self.alpha) #100 #max(self.alpha) #np.mean(self.alpha) # default value in case it didn't change using previous alpha values
+      alpha[k] = max(self.alpha) #np.mean(self.alpha) #100 #max(self.alpha) #np.mean(self.alpha) # default value in case it didn't change using previous alpha values
       # print("alpha {}", k)
       # print(alpha)
       for m, demo in enumerate(sorted_demos):
