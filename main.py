@@ -734,7 +734,7 @@ class Super_human:
       #print("demo_loss, sample_loss: ")
       #print(sorted_demos)
       sorted_demos = np.array(sorted_demos)
-      alpha[k] = max(self.alpha) #np.mean(self.alpha) #100 #max(self.alpha) #np.mean(self.alpha) # default value in case it didn't change using previous alpha values
+      alpha[k] = np.mean(self.alpha) #100 #max(self.alpha) #np.mean(self.alpha) # default value in case it didn't change using previous alpha values
       # print("alpha {}", k)
       # print(alpha)
       for m, demo in enumerate(sorted_demos):
