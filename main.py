@@ -46,7 +46,7 @@ feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds 
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, 'Diabetes': {2:"Female", 1:"Male"}}
-lr_theta = 0.001
+lr_theta = 0.0001
 iters = 5
 num_of_demos = 50
 num_of_features = 4
@@ -191,6 +191,66 @@ class Super_human:
     self.model_obj.fit(X_train, Y_train)
     self.pred_scores = self.model_obj.predict_proba(X_test)
 
+    if self.dataset == 'COMPAS':
+      mode = 'demographic_parity' #'equalized_opportunity' # #'equalized_odds'
+      C = .005
+      if mode == 'demographic_parity':
+        h = DP_fair_logloss_classifier(C=C, random_initialization=True, verbose=False)
+      elif mode == 'equalized_opportunity':
+        h = EOPP_fair_logloss_classifier(C=C, random_initialization=True, verbose=False)
+      elif mode == 'equalized_odds':
+        h = EODD_fair_logloss_classifier(C=C, random_initialization=True, verbose=False)    
+      else:
+        raise ValueError('Invalid second arg')
+    
+      Y_train = Y_train.astype('float64')
+      Y_test = Y_test.astype('float64')
+      A_train = A_train.astype('float64')
+      A_test = A_test.astype('float64')
+      if self.dataset == 'Adult':
+        A_train = A_train - 1
+        A_test = A_test - 1
+
+      for c in list(X_train.columns):
+          if X_train[c].min() < 0 or X_train[c].max() > 1:
+              mu = X_train[c].mean()
+              s = X_train[c].std(ddof=0)
+              X_train.loc[:,c] = (X_train[c] - mu) / s
+              X_train.loc[:,c] = (X_train[c] - mu) / s
+      
+      h.fit(X_train.values,Y_train.values,A_train.values)
+      self.pred_scores = h.predict(X_test.values,A_test.values)
+      
+      print("h.theta: ", h.theta)
+      self.model_obj.coef_ = self.model_obj.coef_ = np.asarray([h.theta[:-1]])
+      print("self.model_obj.coef_: ", self.model_obj.coef_)
+
+
+    """
+    ## if COMPAS use pp_eqodds
+    if self.dataset == 'COMPAS':
+      # Post-processing
+      self.postprocess_est = ThresholdOptimizer(
+          estimator=self.model_obj,
+          constraints= "equalized_odds", #"demographic_parity", 
+          predict_method='auto',
+          prefit=True)
+      # Balanced data set is obtained by sampling the same number of points from the majority class (Y=0)
+      # as there are points in the minority class (Y=1)
+      # if self.dataset != 'Diabetes':
+      #   balanced_idx1 = X_train[Y_train==1].index
+      #   pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
+      #   X_train = X_train.loc[pp_train_idx, :]
+      #   Y_train = Y_train.loc[pp_train_idx]
+      #   A_train = A_train.loc[pp_train_idx]
+
+      # Post-process fitting
+      self.postprocess_est.fit(X_train, Y_train, sensitive_features=A_train)
+      # Post-process preds
+      self.pred_scores = self.postprocess_est.predict(X_test, sensitive_features=A_test)
+      print(self.postprocess_est.get_params())
+    """
+
     ####################################################################################
     # self.model_obj = DP_fair_logloss_classifier(C=.005, random_initialization=True, verbose=False)
     
@@ -242,8 +302,9 @@ class Super_human:
       # Post-processing
       self.postprocess_est = ThresholdOptimizer(
           estimator=model_logi,
-          constraints="demographic_parity", #"equalized_odds",
+          constraints= "equalized_odds", #"demographic_parity", #"true_negative_rate_parity", #, #,
           predict_method='auto',
+          objective = 'balanced_accuracy_score',
           prefit=True)
       # Balanced data set is obtained by sampling the same number of points from the majority class (Y=0)
       # as there are points in the minority class (Y=1)
@@ -260,7 +321,7 @@ class Super_human:
       baseline_preds = self.postprocess_est.predict(X_test, sensitive_features=A_test)
 
     elif self.demo_baseline == "fair_logloss":
-      mode = 'demographic_parity' #'equalized_opportunity' #'equalized_odds'
+      mode = 'equalized_opportunity' #'equalized_odds'
       C = .005
       if mode == 'demographic_parity':
         h = DP_fair_logloss_classifier(C=C, random_initialization=True, verbose=False)
@@ -275,6 +336,7 @@ class Super_human:
       Y_test = Y_test.astype('float64')
       A_train = A_train.astype('float64')
       A_test = A_test.astype('float64')
+      #if self.dataset == 'Adult':
       A_train = A_train - 1
       A_test = A_test - 1
 
@@ -370,8 +432,8 @@ class Super_human:
         random_state=12345,
         stratify=Y
         )
-    dataset_pp = dataset_ref.iloc[idx_train].reset_index(drop=True) # use only pp portion of the data and leave SH Test portion
-    dataset_sh = dataset_ref.iloc[idx_test].reset_index(drop=True)
+    dataset_pp = dataset_ref.loc[idx_train].reset_index(drop=True) # use only pp portion of the data and leave SH Test portion
+    dataset_sh = dataset_ref.loc[idx_test].reset_index(drop=True)
 
     
     train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
@@ -676,9 +738,10 @@ class Super_human:
       # print("alpha {}", k)
       # print(alpha)
       for m, demo in enumerate(sorted_demos):
+        avg_sample_loss = np.mean([demo[1] for demo in sorted_demos])
         if (demo[0] > demo[1]):
           alpha[k] = min(100, 1.0/(demo[0] - demo[1]))  ### limit max alpha to 100
-        if (demo[1] + self.lamda) <= np.mean([x[0] for x in sorted_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
+        if (avg_sample_loss + self.lamda) <= np.mean([x[0] for x in sorted_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
           break
 
     print("--- %s end of compute_alpha ---" % (time.time() - start_time))
