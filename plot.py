@@ -1,6 +1,6 @@
 import os
 import pickle
-from main import Super_human, make_experiment_filename, load_object, find_gamma_superhuman
+from main import Super_human, make_experiment_filename, load_object, find_gamma_superhuman, find_gamma_superhuman_all
 import matplotlib.pyplot as plt
 import seaborn as sns
 import argparse
@@ -42,7 +42,8 @@ def plot_features(noise, dataset, noise_ratio):
     ### TO DO: 1) add legends to the plots
     ###        2) add solid and dashed lines
     ### feature j is on the y axis and i is on the x axis
-    find_gamma_superhuman(demo_list, model_params) 
+    find_gamma_superhuman(demo_list, model_params)
+    find_gamma_superhuman_all(demo_list, model_params)
 
     for i in range(num_of_features):
         for j in range(i+1, num_of_features):
