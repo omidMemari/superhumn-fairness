@@ -80,6 +80,31 @@ def load_object(path,name):
     with open(os.path.join(path,name), 'rb') as file:
         return pickle.load(file)
 
+def find_gamma_superhuman_all(demo_list, model_params):
+  if not model_params: return
+  print("gamma-superhuman: ")
+  gamma_superhuman_arr = []
+  baseline = {0: 'eval_pp_dp', 1:'eval_pp_eq_odds', 2:'eval_fairll_dp', 3:'eval_fairll_eqodds', 4:'eval_MFOpt', 5: 'superhuman'}
+  baseline_loss = np.zeros(len(baseline))
+  dominated = np.zeros(len(baseline))
+  for j in range(len(demo_list)):
+    count_baseline = np.zeros(len(baseline))
+    for i in range(num_of_features):
+      demo_loss = demo_list[j].metric[i] #for z in range(len(demo_list))]
+      model_loss = model_params['eval'][-1].loc[feature[i]][0]
+      baseline_loss[-1] = model_loss
+      for k in range(len(baseline)-1):
+        baseline_loss[k] = model_params[baseline[k]].loc[feature[i]][0]
+      for k in range(len(baseline)):
+        if baseline_loss[k] <= demo_loss:
+          count_baseline[k] += 1
+          if count_baseline[k] == num_of_features:
+            dominated[k] += 1
+  dominated = dominated/len(demo_list)
+  print(baseline)
+  print("dominated:")
+  print(dominated)
+
 def find_gamma_superhuman(demo_list, model_params):
   if not model_params: return 
   print("gamma-superhuman: ")
