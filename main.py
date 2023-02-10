@@ -14,6 +14,7 @@ import copy
 import math
 import argparse
 from tqdm import tqdm
+from test_nn import predict_nn
 warnings.filterwarnings('ignore')
 
 # Data processing
@@ -46,14 +47,14 @@ feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds 
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, 'Diabetes': {2:"Female", 1:"Male"}}
-lr_theta = 0.0001
+lr_theta = 0.01
 iters = 30
 num_of_demos = 50
 num_of_features = 4
 alpha = 0.5
 beta = 0.5
 lamda = 0.01
-demo_baseline = "fair_logloss" #"pp"
+demo_baseline = "pp" #"fair_logloss" #
 model = "logistic_regression"
 noise_ratio = 0.2
 noise_list = [0.2]#0.03, 0.04]#[0.06, 0.07, 0.08, 0.09]##[0.16, 0.17, 0.18, 0.19, 0.20]#[0.11, 0.12, 0.13, 0.14, 0.15]#########
@@ -249,53 +250,6 @@ class Super_human:
       print("h.theta: ", h.theta)
       self.model_obj.coef_ = self.model_obj.coef_ = np.asarray([h.theta[:-1]])
       print("self.model_obj.coef_: ", self.model_obj.coef_)
-
-
-    """
-    ## if COMPAS use pp_eqodds
-    if self.dataset == 'COMPAS':
-      # Post-processing
-      self.postprocess_est = ThresholdOptimizer(
-          estimator=self.model_obj,
-          constraints= "equalized_odds", #"demographic_parity", 
-          predict_method='auto',
-          prefit=True)
-      # Balanced data set is obtained by sampling the same number of points from the majority class (Y=0)
-      # as there are points in the minority class (Y=1)
-      # if self.dataset != 'Diabetes':
-      #   balanced_idx1 = X_train[Y_train==1].index
-      #   pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
-      #   X_train = X_train.loc[pp_train_idx, :]
-      #   Y_train = Y_train.loc[pp_train_idx]
-      #   A_train = A_train.loc[pp_train_idx]
-
-      # Post-process fitting
-      self.postprocess_est.fit(X_train, Y_train, sensitive_features=A_train)
-      # Post-process preds
-      self.pred_scores = self.postprocess_est.predict(X_test, sensitive_features=A_test)
-      print(self.postprocess_est.get_params())
-    """
-
-    ####################################################################################
-    # self.model_obj = DP_fair_logloss_classifier(C=.005, random_initialization=True, verbose=False)
-    
-    # Y_train = Y_train.astype('float64')
-    # Y_test = Y_test.astype('float64')
-    # A_train = A_train.astype('float64')
-    # A_test = A_test.astype('float64')
-    # A_train = A_train - 1
-    # A_test = A_test - 1
-
-    # for c in list(X_train.columns):
-    #     if X_train[c].min() < 0 or X_train[c].max() > 1:
-    #         mu = X_train[c].mean()
-    #         s = X_train[c].std(ddof=0)
-    #         X_train.loc[:,c] = (X_train[c] - mu) / s
-    #         X_train.loc[:,c] = (X_train[c] - mu) / s
-    
-    # self.model_obj.fit(X_train.values,Y_train.values,A_train.values)
-    # self.pred_scores = self.model_obj.predict(X_test.values,A_test.values)
-    ############################################################################################
 
     self.base_dict = {"model_obj": self.model_obj,
                  "pred_scores": self.pred_scores,
@@ -503,26 +457,6 @@ class Super_human:
     store_object(self.demo_list, file_dir, demo_list_filename)
 
   def save_AXY(self, A_train, X_train, Y_train, A_test, X_test, Y_test):
-    # A_train = train[self.sensitive_feature]
-    # A_str_train = A_train.map(self.dict_map)
-    # Y_train = train[self.label]
-    # idx_train = train.index.tolist()
-    # X_train = train.drop(columns=[self.label])
-    # if self.noise == True:
-    #   demo = self.data_demo(X_train, X_train, Y_train, Y_test, A_train, A_train, A_str_train, A_str_train, idx_train, idx_train)
-    #   noisy_demo = self.add_noise_new(demo)
-    #   A_train = noisy_demo.test_A
-    #   Y_train = noisy_demo.train_y
-    #   A_str_train = noisy_demo.test_A_str
-
-    # A_test = test[self.sensitive_feature]
-    # A_str_test = A_test.map(self.dict_map)
-    # Y_test = test[self.label]
-    # idx_test = test.index.tolist()
-    # X_test = test.drop(columns=[self.label])
-
-    #train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
-    #train_file_path = os.path.join(self.train_data_path, train_data_filename)
 
     A_train.to_csv(os.path.join("dataset", self.dataset, 'A_train.csv'),  sep='\t')
     X_train.to_csv(os.path.join("dataset", self.dataset, 'X_train.csv'),  sep='\t')
@@ -532,13 +466,6 @@ class Super_human:
     X_test.to_csv(os.path.join("dataset", self.dataset, 'X_test.csv'),  sep='\t')
     Y_test.to_csv(os.path.join("dataset", self.dataset, 'Y_test.csv'),  sep='\t')
     
-
-
-
-    
-
-    
-
 
   def add_noise(self, data, protected=False):
     if protected:
@@ -776,41 +703,6 @@ class Super_human:
     find_gamma_superhuman(self.demo_list, self.model_params)
     return alpha
 
-  # def compute_alpha(self):
-  #   start_time = time.time()
-  #   alpha = self.alpha#np.ones(self.num_of_features)
-  
-  #   for k in range(self.num_of_features):
-  #     sorted_demos = []
-  #     alpha_candidate = []
-  #     for j in range(self.num_of_demos):
-  #       sample_loss = self.sample_loss[j, k]
-  #       demo_loss = self.demo_list[j].metric[k] 
-  #       sorted_demos.append((demo_loss, sample_loss))
-      
-  #     sorted_demos.sort(key = lambda x: x[0]) #dominated_demos.sort(key = lambda x: x[0], reverse=True)   # sort based on demo loss
-  #     sorted_demos = np.array(sorted_demos)
-  #     alpha[k] = np.mean(alpha) # default value in case it didn't change
-  #     #print(self.feature[k])
-  #     #print("demo_loss, sample_loss: ")
-  #     #print(sorted_demos)
-  #     for m, demo in enumerate(sorted_demos):
-  #       avg_sample_loss = np.mean([demo[1] for demo in sorted_demos])
-  #       if (demo[0] > demo[1] and 1.0/(demo[0] - demo[1]) < 100):
-  #         alpha[k] = 1.0/(demo[0] - demo[1])
-  #       else:
-  #         alpha[k] = np.mean(alpha)
-  #         #print(alpha[k])
-  #       if (avg_sample_loss) <= np.mean([x[0] for x in sorted_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
-  #         print("chosen!")
-  #         break
-
-  #   print("--- %s end of compute_alpha ---" % (time.time() - start_time))
-  #   print("alpha : ")
-  #   print(alpha)
-  #   #model_params = {"eval": self.eval}
-  #   find_gamma_superhuman(self.demo_list, self.model_params)
-  #   return alpha
 
   def eval_model_baseline(self, baseline="pp", mode="demographic_parity"):
 
@@ -884,21 +776,10 @@ class Super_human:
       else:
         raise ValueError('Invalid second arg')
     
-      # Y_train = Y_train.astype('float64')
-      # Y_test = Y_test.astype('float64')
-      # A_train = A_train.astype('float64')
-      # A_test = A_test.astype('float64')
       if dataset == 'Adult' or dataset == 'Diabetes':
         A_train = A_train - 1
         A_test = A_test - 1
 
-      # for c in list(X_train.columns):
-      #     if X_train[c].min() < 0 or X_train[c].max() > 1:
-      #         mu = X_train[c].mean()
-      #         s = X_train[c].std(ddof=0)
-      #         X_train.loc[:,c] = (X_train[c] - mu) / s
-      #         X_train.loc[:,c] = (X_train[c] - mu) / s
-      
       h.fit(X_train.values,Y_train.values,A_train.values)
       baseline_preds = h.predict(X_test.values,A_test.values)
       baseline_scores = h.predict_proba(X_test.values,A_test.values) 
@@ -974,6 +855,7 @@ class Super_human:
       Y_train = self.train_data[self.label]
       Y_test = Y_train
       X = self.train_data.drop(columns=[self.label])
+      
     elif mode == "test-sh" or mode == "test-pp":
       # read train data: we need Y_train to predict test data
       train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
@@ -991,10 +873,9 @@ class Super_human:
 
     # Scores on train set
     scores = self.model_obj.predict_proba(X)[:, 1]
-    # Train AUC
-    #roc_auc_score(Y_train, self.model_obj.predict_proba(X_train)[:, 1])
     # Predictions (0 or 1) on test set
     preds = (scores >= np.mean(Y_train)) * 1
+    #preds = predict_nn(X, Y_train, A, X, Y_test, A, self)
     # Metrics
     eval = pd.DataFrame(index = [self.feature[i] for i in range(self.num_of_features)]) #['Demographic parity difference', 'False negative rate difference', 'ZeroOne']
     models_dict = {
