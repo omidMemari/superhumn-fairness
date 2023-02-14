@@ -1,5 +1,7 @@
 import numpy as np
 import pandas as pd
+import pickle
+import os
 # Metrics
 from fairlearn.metrics import (
     MetricFrame,
@@ -9,25 +11,86 @@ from fairlearn.metrics import (
     equalized_odds_difference)
 from sklearn.metrics import balanced_accuracy_score, roc_auc_score, zero_one_loss
 
-# def dp_difference(y_true, y_pred, group):
-#     g0, g1, n0, n1 = 0, 0, 0, 0
-#     print(len(y_true))
-#     print(group)
-#     for i in range(len(y_true)):
-#         if group.loc[i] == 'Male':
-#             n1 += 1
-#             if y_pred[i] == 1:
-#                 g1 += 1
-#         else: 
-#             n0 += 1
-#             if y_pred[i] ==1:
-#                 g0 += 1
-#     dp1 = g1/n1
-#     dp0 = g0/n0
+sample_record_filename_template = "{}_{}_{}_{}_{}"
 
-#     return abs(dp1 - dp0)
+feature_expand_dict = {'inacc': "ZeroOne", 'dp': "Demographic parity difference", 'eqodds': "Equalized odds difference", 'prp': "Predictive value difference", 'eqopp': "False negative rate difference",  'fnr': "False negative rate difference", 'fpr': "False positive rate difference", 'ppv': "Positive predictive value difference", 'npv': "Negative predictive value difference", 'auc': "Overall AUC", 'auc_diff': "AUC difference", 'error_rate_diff': "Balanced error rate difference"}
 
-#     #return abs(np.mean(proba[A == 1]) - np.mean(proba[A == 0]))
+def compute_error(Yhat,proba,Y):
+    err = 1 - np.sum(Yhat == Y) / Y.shape[0] 
+    exp_zeroone = np.mean(np.where(Y == 1 , 1 - proba, proba))
+    return err, exp_zeroone
+
+def create_features_dict(feature_list):
+  num_of_features = len(feature_list)
+  feature = {}
+  for i, f in enumerate(feature_list):
+    feature[i] = feature_expand_dict[f]
+  return feature, num_of_features
+
+def make_experiment_filename(**kwargs):
+    return sample_record_filename_template.format(kwargs['dataset'], kwargs['demo_baseline'], kwargs['lr_theta'],  kwargs['num_of_demos'], kwargs['noise_ratio']).replace('.','-')
+
+def make_demo_list_filename(**kwargs):
+    return "demo_list_{}_{}_{}_{}".format(kwargs['dataset'], kwargs['demo_baseline'],  kwargs['num_of_demos'], kwargs['noise_ratio']).replace('.','-')
+
+
+def store_object(obj,path, name):
+    filepath = os.path.join(path,name)
+    with open(filepath, 'wb') as file:
+        pickle.dump(obj,file)
+    print("Record wrote to {}".format(filepath))
+
+def load_object(path,name):
+    with open(os.path.join(path,name), 'rb') as file:
+        return pickle.load(file)
+
+def find_gamma_superhuman_all(demo_list, model_params):
+  if not model_params: return
+  feature = model_params["feature"]
+  num_of_features = model_params["num_of_features"]
+  print("gamma-superhuman: ")
+  gamma_superhuman_arr = []
+  baseline = {0: 'eval_pp_dp', 1:'eval_pp_eq_odds', 2:'eval_fairll_dp', 3:'eval_fairll_eqodds', 4:'eval_MFOpt', 5: 'superhuman'}
+  baseline_loss = np.zeros(len(baseline))
+  dominated = np.zeros(len(baseline))
+  for j in range(len(demo_list)):
+    count_baseline = np.zeros(len(baseline))
+    for i in range(num_of_features):
+      demo_loss = demo_list[j].metric[i] #for z in range(len(demo_list))]
+      model_loss = model_params['eval'][-1].loc[feature[i]][0]
+      baseline_loss[-1] = model_loss
+      for k in range(len(baseline)-1):
+        baseline_loss[k] = model_params[baseline[k]].loc[feature[i]][0]
+      for k in range(len(baseline)):
+        if baseline_loss[k] <= demo_loss:
+          count_baseline[k] += 1
+          if count_baseline[k] == num_of_features:
+            dominated[k] += 1
+  dominated = dominated/len(demo_list)
+  print(baseline)
+  print("dominated:")
+  print(dominated)
+
+def find_gamma_superhuman(demo_list, model_params):
+  if not model_params: return
+  feature = model_params["feature"]
+  num_of_features = model_params["num_of_features"]
+  print("gamma-superhuman: ")
+  gamma_superhuman_arr = []
+  for i in range(num_of_features):
+      demo_loss = [demo_list[z].metric[i] for z in range(len(demo_list))]
+      model_loss = model_params['eval'][-1].loc[feature[i]][0]
+      f = feature[i]
+      n = len(demo_loss)
+      count = 0
+      for j in range(n):
+          if model_loss <= demo_loss[j]:
+              count += 1
+      gamma_superhuman = count/n
+      print(gamma_superhuman, f)
+      gamma_superhuman_arr.append(gamma_superhuman)
+  return gamma_superhuman_arr
+
 
 
 def true_positives(y_true, y_pred):
@@ -60,11 +123,6 @@ def false_negatives(y_true, y_pred):
             fn += 1
     return fn
 
-# backup
-# def positive_predictive_value_helper(y_true, y_pred):
-#     tp = np.sum(np.logical_and(y_true, y_pred))
-#     fp = np.sum(np.logical_and(np.logical_not(y_true), y_pred))
-#     return tp / (tp + fp)
 
 
 def positive_predictive_value_helper(y_true, y_pred):
@@ -130,12 +188,6 @@ def false_negatives(y_true, y_pred):
         if y_true[i] == 1 and y_pred[i] == 0:
             fn += 1
     return fn
-
-# backup
-# def positive_predictive_value_helper(y_true, y_pred):
-#     tp = np.sum(np.logical_and(y_true, y_pred))
-#     fp = np.sum(np.logical_and(np.logical_not(y_true), y_pred))
-#     return tp / (tp + fp)
 
 
 def positive_predictive_value_helper(y_true, y_pred):
@@ -174,47 +226,44 @@ def predictive_value(y_true, y_pred, group) -> float:
 
 
 # Helper functions
-def get_metrics_df(models_dict, y_true, group):
-    # print("models_dict: ")
-    # print(models_dict)
-    # print("y_true: ")
-    # print(y_true)
+def get_metrics_df(models_dict, y_true, group, feature, is_demo = False):
     metrics_dict = {
 
          "ZeroOne": (
             lambda x: zero_one_loss(y_true, x), True),
         "Demographic parity difference": (
-            lambda x: demographic_parity_difference(y_true, x, sensitive_features=group), True), #dp_difference(y_true, x, group), True),
+            lambda x: demographic_parity_difference(y_true, x, sensitive_features=group), True),
         "Equalized odds difference": (
             lambda x: equalized_odds_difference(y_true, x, sensitive_features=group), True),
         "Predictive value difference": (
-            lambda x: predictive_value(y_true, x, group), True)
-        #"Overall selection rate": (
-        #    lambda x: selection_rate(y_true, x), True),
-
-        
-        #"Demographic parity ratio": (
-        #    lambda x: demographic_parity_ratio(y_true, x, sensitive_features=group), True),
-        #"Overall balanced error rate": (
-        #    lambda x: 1-balanced_accuracy_score(y_true, x), True),
-        #"Balanced error rate difference": (
-        #    lambda x: MetricFrame(metrics=balanced_accuracy_score, y_true=y_true, y_pred=x, sensitive_features=group).difference(method='between_groups'), True),
-        # "False positive rate difference": (
-        #     lambda x: false_positive_rate_difference(y_true, x, sensitive_features=group), True),
-        # "False negative rate difference": (
-        #     lambda x: false_negative_rate_difference(y_true, x, sensitive_features=group), True),
-        
-        # "Positive predictive value difference": (
-        #     lambda x: positive_predictive_value(y_true, x, group), True),
-        # "Negative predictive value difference": (
-        #     lambda x: negative_predictive_value(y_true, x, group), True),
-        #"Overall AUC": (
-        #    lambda x: 1.0 - roc_auc_score(y_true, x), False),
-        #"AUC difference": (
-        #    lambda x: MetricFrame(metrics=roc_auc_score, y_true=y_true, y_pred=x, sensitive_features=group).difference(method='between_groups'), False),
+            lambda x: predictive_value(y_true, x, group), True),
+        "Overall selection rate": (
+           lambda x: selection_rate(y_true, x), True),
+        "Demographic parity ratio": (
+           lambda x: demographic_parity_ratio(y_true, x, sensitive_features=group), True),
+        "Overall balanced error rate": (
+           lambda x: 1-balanced_accuracy_score(y_true, x), True),
+        "Balanced error rate difference": (
+           lambda x: MetricFrame(metrics=balanced_accuracy_score, y_true=y_true, y_pred=x, sensitive_features=group).difference(method='between_groups'), True),
+        "False positive rate difference": (
+            lambda x: false_positive_rate_difference(y_true, x, sensitive_features=group), True),
+        "False negative rate difference": (
+            lambda x: false_negative_rate_difference(y_true, x, sensitive_features=group), True),       
+        "Positive predictive value difference": (
+            lambda x: positive_predictive_value(y_true, x, group), True),
+        "Negative predictive value difference": (
+            lambda x: negative_predictive_value(y_true, x, group), True),
+        "Overall AUC": (
+           lambda x: 1.0 - roc_auc_score(y_true, x), False),
+        "AUC difference": (
+           lambda x: MetricFrame(metrics=roc_auc_score, y_true=y_true, y_pred=x, sensitive_features=group).difference(method='between_groups'), False)
     }
     df_dict = {}
-    for metric_name, (metric_func, use_preds) in metrics_dict.items():
+    if is_demo == True:     # if we are creating demos, let's store all the metrics
+        metrics_dict_subset = metrics_dict
+    else:                   # otherwise only store the metrics we care about
+        metrics_dict_subset = {k: metrics_dict[k] for k in feature.values()}
+    for metric_name, (metric_func, use_preds) in metrics_dict_subset.items():
         df_dict[metric_name] = [metric_func(preds) if use_preds else metric_func(scores) 
                                 for model_name, (preds, scores) in models_dict.items()]
     return pd.DataFrame.from_dict(df_dict, orient="index", columns=models_dict.keys())

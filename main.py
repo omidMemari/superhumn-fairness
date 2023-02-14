@@ -3,7 +3,6 @@ import sys
 import seaborn as sns
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
 from pandas.core.strings import base
 import random
 import pickle
@@ -16,118 +15,33 @@ import argparse
 from tqdm import tqdm
 from test_nn import predict_nn
 warnings.filterwarnings('ignore')
-
-# Data processing
 from sklearn.model_selection import train_test_split
-
-# Models
 import lightgbm as lgb
 from sklearn.linear_model import LogisticRegression
-from sklearn.calibration import CalibratedClassifierCV
-
 # Fairlearn algorithms and utils
 from fairlearn.postprocessing import ThresholdOptimizer
-from fairlearn.reductions import GridSearch, EqualizedOdds
-
-from sklearn.datasets import fetch_openml
-from util import get_metrics_df
-# Metrics
-from fairlearn.metrics import (
-    MetricFrame,
-    selection_rate, demographic_parity_difference, demographic_parity_ratio,
-    false_positive_rate, false_negative_rate,
-    false_positive_rate_difference, false_negative_rate_difference,
-    equalized_odds_difference)
-from sklearn.metrics import balanced_accuracy_score, roc_auc_score, zero_one_loss
-
+from util import compute_error, get_metrics_df, create_features_dict, find_gamma_superhuman, find_gamma_superhuman_all, load_object, store_object, make_demo_list_filename, make_experiment_filename
 from fair_logloss.fair_logloss import DP_fair_logloss_classifier, EOPP_fair_logloss_classifier, EODD_fair_logloss_classifier
 
-#feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference", 5: "Positive predictive value difference", 6: "Negative predictive value difference", 7: "Predictive value difference"}
-feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds difference", 3: "Predictive value difference"}
+
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, 'Diabetes': {2:"Female", 1:"Male"}}
 lr_theta = 0.01
-iters = 30
+iters = 14
 num_of_demos = 50
-num_of_features = 4
 alpha = 0.5
 beta = 0.5
 lamda = 0.01
-demo_baseline = "pp" #"fair_logloss" #
+demo_baseline = "pp" #"fair_logloss" 
 model = "logistic_regression"
 noise_ratio = 0.2
-noise_list = [0.2]#0.03, 0.04]#[0.06, 0.07, 0.08, 0.09]##[0.16, 0.17, 0.18, 0.19, 0.20]#[0.11, 0.12, 0.13, 0.14, 0.15]#########
-
-
-
-sample_record_filename_template = "{}_{}_{}_{}_{}"
-
-
-def make_experiment_filename(**kwargs):
-    return sample_record_filename_template.format(kwargs['dataset'], kwargs['demo_baseline'], kwargs['lr_theta'],  kwargs['num_of_demos'], kwargs['noise_ratio']).replace('.','-')
-
-def make_demo_list_filename(**kwargs):
-    return "demo_list_{}_{}_{}_{}".format(kwargs['dataset'], kwargs['demo_baseline'],  kwargs['num_of_demos'], kwargs['noise_ratio']).replace('.','-')
-
-
-def store_object(obj,path, name):
-    filepath = os.path.join(path,name)
-    with open(filepath, 'wb') as file:
-        pickle.dump(obj,file)
-    print("Record wrote to {}".format(filepath))
-
-def load_object(path,name):
-    with open(os.path.join(path,name), 'rb') as file:
-        return pickle.load(file)
-
-def find_gamma_superhuman_all(demo_list, model_params):
-  if not model_params: return
-  print("gamma-superhuman: ")
-  gamma_superhuman_arr = []
-  baseline = {0: 'eval_pp_dp', 1:'eval_pp_eq_odds', 2:'eval_fairll_dp', 3:'eval_fairll_eqodds', 4:'eval_MFOpt', 5: 'superhuman'}
-  baseline_loss = np.zeros(len(baseline))
-  dominated = np.zeros(len(baseline))
-  for j in range(len(demo_list)):
-    count_baseline = np.zeros(len(baseline))
-    for i in range(num_of_features):
-      demo_loss = demo_list[j].metric[i] #for z in range(len(demo_list))]
-      model_loss = model_params['eval'][-1].loc[feature[i]][0]
-      baseline_loss[-1] = model_loss
-      for k in range(len(baseline)-1):
-        baseline_loss[k] = model_params[baseline[k]].loc[feature[i]][0]
-      for k in range(len(baseline)):
-        if baseline_loss[k] <= demo_loss:
-          count_baseline[k] += 1
-          if count_baseline[k] == num_of_features:
-            dominated[k] += 1
-  dominated = dominated/len(demo_list)
-  print(baseline)
-  print("dominated:")
-  print(dominated)
-
-def find_gamma_superhuman(demo_list, model_params):
-  if not model_params: return 
-  print("gamma-superhuman: ")
-  gamma_superhuman_arr = []
-  for i in range(num_of_features):
-      demo_loss = [demo_list[z].metric[i] for z in range(len(demo_list))]
-      model_loss = model_params['eval'][-1].loc[feature[i]][0]
-      f = feature[i]
-      n = len(demo_loss)
-      count = 0
-      for j in range(n):
-          if model_loss <= demo_loss[j]:
-              count += 1
-      gamma_superhuman = count/n
-      print(gamma_superhuman, f)
-      gamma_superhuman_arr.append(gamma_superhuman)
-  return gamma_superhuman_arr
+noise_list = [0.2]#0.03, 0.04]#[0.06, 0.07, 0.08, 0.09]##[0.16, 0.17, 0.18, 0.19, 0.20]#[0.11, 0.12, 0.13, 0.14, 0.15]
 
 
 class Super_human:
 
-  def __init__(self, dataset, num_of_demos, num_of_features, lr_theta, noise, noise_ratio):
+  def __init__(self, dataset, num_of_demos, feature, num_of_features, lr_theta, noise, noise_ratio):
     self.dataset = dataset
     self.num_of_demos = num_of_demos
     self.num_of_features = num_of_features
@@ -281,7 +195,7 @@ class Super_human:
       # Post-processing
       self.postprocess_est = ThresholdOptimizer(
           estimator=model_logi,
-          constraints= "equalized_odds", #"demographic_parity", #"true_negative_rate_parity", #, #,
+          constraints= "demographic_parity", #"equalized_odds", #"true_negative_rate_parity", #, #,
           predict_method='auto',
           objective = 'balanced_accuracy_score',
           prefit=True)
@@ -342,7 +256,7 @@ class Super_human:
     # # Metrics
     # models_dict = {
     #           self.demo_baseline : (baseline_preds, baseline_preds)}          
-    result = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test)
+    result = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test, feature = feature, is_demo = True)
 
     return result
 
@@ -481,9 +395,6 @@ class Super_human:
     idx = np.random.permutation(range(n))[:int(self.noise_ratio*n)]
     #print(idx)
     if protected==True and (self.dataset == 'Adult' or dataset == 'Diabetes'): # checked! works well!
-      # Y[idx] = Y[idx] - 1   # change 1,2 to 0,1
-      # noisy_Y[idx] = 1-Y[idx] # change 0,1 to 1,0
-      # noisy_Y[idx] = noisy_Y[idx] + 1   # revert 1,0 to 2,1
       Y['gender'].loc[idx] = Y['gender'].loc[idx] - 1   # change 1,2 to 0,1
       noisy_Y['gender'].loc[idx] = 1-Y['gender'].loc[idx] # change 0,1 to 1,0
       noisy_Y['gender'].loc[idx] = noisy_Y['gender'].loc[idx] + 1   # revert 1,0 to 2,1
@@ -491,10 +402,6 @@ class Super_human:
       noisy_Y['race'].loc[idx] = 1-Y['race'].loc[idx]
     elif protected==False:
       noisy_Y[self.label].loc[idx] = 1 - Y[self.label].loc[idx] # if adding noise to the label
-      # print("###########################################")
-      # print(Y.loc[idx])
-      # print(noisy_Y.loc[idx])
-      # print("#########################################")
     
     return noisy_Y
 
@@ -539,9 +446,6 @@ class Super_human:
 
     return data_demo
 
-  
-  def read_sample_matrix(self):
-    self.sample_matrix = np.load('sample_matrix.npy')
 
   def read_demo_list(self):
     file_dir = os.path.join(self.data_path)
@@ -602,7 +506,7 @@ class Super_human:
       y = self.train_data.loc[demo.idx_test][self.label] # we use true_y from original dataset since y_true in demo can be noisy (in noise setting)
       A = self.train_data.loc[demo.idx_test][self.sensitive_feature]
       A_str = A.map(self.dict_map)
-      metric_df = get_metrics_df(models_dict = models_dict, y_true = y, group = A_str) #### takes so much time!!! #metric_df = get_metrics_df(models_dict = models_dict, y_true = demo.test_y, group = demo.test_A_str)
+      metric_df = get_metrics_df(models_dict = models_dict, y_true = y, group = A_str, feature = feature, is_demo = False) #### takes so much time!!! #metric_df = get_metrics_df(models_dict = models_dict, y_true = demo.test_y, group = demo.test_A_str)
       for feature_index in range(self.num_of_features):
         self.sample_loss[demo_index, feature_index] = metric_df.loc[self.feature[feature_index]]["Super_human"] #metric[feature_index]
     
@@ -682,13 +586,8 @@ class Super_human:
         sorted_demos.append((demo_loss, sample_loss))
       
       sorted_demos.sort(key = lambda x: x[0]) #dominated_demos.sort(key = lambda x: x[0], reverse=True)   # sort based on demo loss
-      #print(self.feature[k])
-      #print("demo_loss, sample_loss: ")
-      #print(sorted_demos)
       sorted_demos = np.array(sorted_demos)
       alpha[k] = np.mean(self.alpha) #100 #max(self.alpha) #np.mean(self.alpha) # default value in case it didn't change using previous alpha values
-      # print("alpha {}", k)
-      # print(alpha)
       for m, demo in enumerate(sorted_demos):
         avg_sample_loss = np.mean([demo[1] for demo in sorted_demos])
         if (demo[0] > demo[1]):
@@ -731,10 +630,6 @@ class Super_human:
         self.save_AXY(A_train - 1, X_train, Y_train, A_test - 1, X_test, Y_test)
       elif self.dataset == 'COMPAS':
         self.save_AXY(A_train, X_train, Y_train, A_test, X_test, Y_test)
-      #X_test, Y_test, A_test, A_str_test = demo.test_x, demo.test_y, demo.test_A, demo.test_A_str
-
-    
-
 
 
     if baseline == "pp":
@@ -763,7 +658,7 @@ class Super_human:
        # Metrics
       models_dict = {
                 baseline+"_"+mode : (baseline_preds, baseline_preds)}
-      return get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test)
+      return get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test, feature = feature, is_demo = False)
     
     elif baseline == "fair_logloss":
       C = .005
@@ -786,7 +681,7 @@ class Super_human:
       baseline_preds[np.isnan(baseline_preds)] = 1
       violation = h.fairness_violation(X_test.values, Y_test.values, A_test.values)
       accuracy = h.score(X_test.values, Y_test.values, A_test.values) 
-      err, exp_zeroone = self.compute_error(baseline_preds, baseline_scores, Y_test.values)
+      err, exp_zeroone = compute_error(baseline_preds, baseline_scores, Y_test.values)
       print(baseline+" "+mode+" violation: ")
       print(violation)
       print("expected_error: ")
@@ -795,7 +690,7 @@ class Super_human:
        # Metrics
       models_dict = {
                 baseline+"_"+mode : (baseline_preds, baseline_preds)}
-      metrics = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test)
+      metrics = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test, feature = feature, is_demo = False)
       # Since fair logloss uses expected violation, we use metrics from their code
       metrics[baseline+"_"+mode]['ZeroOne'] = exp_zeroone
       if mode == "demographic_parity":
@@ -821,7 +716,7 @@ class Super_human:
       Y_test = self.test_data['y']
       baseline_preds = self.test_data['bin'] - 1
       baseline_scores = self.test_data.index
-      err, exp_zeroone = self.compute_error(baseline_preds, baseline_scores, Y_test.values)
+      err, exp_zeroone = compute_error(baseline_preds, baseline_scores, Y_test.values)
       print("expected_error: ")
       print(exp_zeroone)
       #X_train = self.train_data.drop(columns=[self.label])
@@ -829,18 +724,9 @@ class Super_human:
        # Metrics
       models_dict = {
                 baseline : (baseline_preds, baseline_preds)}
-      metrics = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test)
+      metrics = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test, feature = feature, is_demo = False)
       metrics[baseline]['ZeroOne'] = exp_zeroone
       return metrics
-
-
-
-  def compute_error(self, Yhat,proba,Y):
-    err = 1 - np.sum(Yhat == Y) / Y.shape[0] 
-    exp_zeroone = np.mean(np.where(Y == 1 , 1 - proba, proba))
-    return err, exp_zeroone
-    
-
 
 
   def eval_model(self, mode):
@@ -880,10 +766,10 @@ class Super_human:
     eval = pd.DataFrame(index = [self.feature[i] for i in range(self.num_of_features)]) #['Demographic parity difference', 'False negative rate difference', 'ZeroOne']
     models_dict = {
               "Super_human": (preds, preds)}
-    eval = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str)
+    eval = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str, feature = feature, is_demo = False)
     return eval
 
-  def get_model_thetha(self):
+  def get_model_theta(self):
     return self.model_obj.coef_[0]
   
   def get_model_alpha(self):
@@ -907,7 +793,7 @@ class Super_human:
       self.get_sample_loss()
       
       # get the current theta and alpha
-      theta = self.get_model_thetha()
+      theta = self.get_model_theta()
       alpha = self.get_model_alpha()
       # find new theta
       subdom_tensor_sum, grad_theta = self.compute_grad_theta() # computer gradient of loss w.r.t theta by sampling from our model
@@ -929,7 +815,7 @@ class Super_human:
       self.grad_theta.append(grad_theta)
       subdom_tensor_sum_arr.append(subdom_tensor_sum)
       self.eval.append(eval_i)
-      model_params = {"model":self.model_obj, "theta": self.model_obj.coef_, "alpha":self.alpha, "eval": self.eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features, "demo_baseline": self.demo_baseline}
+      model_params = {"model":self.model_obj, "theta": self.model_obj.coef_, "alpha":self.alpha, "eval": self.eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features, "demo_baseline": self.demo_baseline, "feature": self.feature}
       gamma_superhuman = find_gamma_superhuman(self.demo_list, model_params)
       self.gamma_superhuman_arr.append(gamma_superhuman)
       print("gamma_superhuman: ")
@@ -1008,29 +894,33 @@ if __name__ == "__main__":
   parser.add_argument('-t','--task', help='enter the task to do', required=True)
   parser.add_argument('-n','--noise', help='noisy demos used if True', default='False')
   parser.add_argument('-d', '--dataset', help="dataset name", required=True)
+  parser.add_argument('-f', '--features', help="features list", nargs='+', default=['inacc, dp, eqodds, prp'])
   
   args = vars(parser.parse_args())
   
-  dataset = args['dataset'] ##
+  dataset = args['dataset']
+  feature_list = args['features']
+  feature, num_of_features = create_features_dict(feature_list)
+  print(feature_list)
   noise = eval(args['noise'])
   print("dataset: ", dataset)
   if noise==False:
     noise_ratio = 0.0
   
   if args['task'] == 'prepare-demos':
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
     #sh_obj.base_model()
     sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta) # this alpha is different from self.alpha
 
   elif args['task'] == 'train':
     print("lr_theta: ", lr_theta)
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
     sh_obj.base_model()
     sh_obj.read_demo_list()
     sh_obj.update_model(lr_theta, iters)
 
   elif args['task'] == 'test':
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
     #sh_obj.base_model()
     sh_obj.read_model_from_file()
     sh_obj.test_model()
@@ -1038,7 +928,7 @@ if __name__ == "__main__":
   elif args['task'] == 'noise-test':
     noise = True
     for noise_ratio in noise_list:
-      sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
+      sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
       sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta)
       sh_obj.base_model()
       sh_obj.read_demo_list()

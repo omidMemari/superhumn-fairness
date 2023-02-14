@@ -1,32 +1,29 @@
 import os
 import pickle
-from main import Super_human, make_experiment_filename, load_object, find_gamma_superhuman, find_gamma_superhuman_all
 import matplotlib.pyplot as plt
 import seaborn as sns
 import argparse
 import numpy as np
+from main import Super_human
+from util import create_features_dict, make_experiment_filename, load_object, find_gamma_superhuman, find_gamma_superhuman_all
 
 
-#method_label =  {'zehlike':'DELTR', 'policy_learning': 'Fair-PGRank', 'post_processing':'Post_Proc', 'fair_robust': 'Fair_Robust', 'random_ranker': 'Random_Ranker'}
 markers = {0:"o", 1: "*", 2: "x", 3:"<", 4:"v"}
 colors = {0:'orange', 1: 'red', 2: 'blue', 3:'green', 4:'black'}
 
-#feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "False negative rate difference", 3: "False positive rate difference", 4: "Equalized odds difference", 5: "Positive predictive value difference", 6: "Negative predictive value difference", 7: "Predictive value difference"}
-feature = {0: "ZeroOne", 1: "Demographic parity difference", 2: "Equalized odds difference", 3: "Predictive value difference"}
-name = {0: "Prediction error", 1: "D.DP", 2: "D.EqOdds", 3: "D.PRP"}
-short = {"ZeroOne": "error", "Demographic parity difference": "DP", "D.FNR": "FNR", "D.FPR": "FPR", "Equalized odds difference": "EqOdds", "D.PPV": "PPV", "D.NPV":"NPV", "Predictive value difference":"PRP"}
-lr_theta = 0.0001
+name = {"ZeroOne": "Prediction error", "Demographic parity difference": "D.DP", "Equalized odds difference": "D.EqOdds", "Predictive value difference": "D.PRP", "False negative rate difference": "D.FNR",  "False positive rate difference": "D.FPR", "Positive predictive value difference": "D.PPV", "Negative predictive value difference": "D.NPV", "Overall AUC": "AUC", "AUC difference": "D.AUC", "Balanced error rate difference": "D.Balanced Error Rate"}
+short = {"ZeroOne": "error", "Demographic parity difference": "DP", "D.FNR": "FNR", "D.FPR": "FPR", "Equalized odds difference": "EqOdds", "D.PPV": "PPV", "D.NPV":"NPV", "Predictive value difference":"PRP", "Balanced error rate difference": "D.ErrorRate", "Positive predictive value difference": "PPV", "Negative predictive value difference": "NPV", "Overall AUC": "AUC", "AUC difference": "D.AUC"}
+lr_theta = 0.01
 num_of_demos = 50
-num_of_features = 4
-demo_baseline = "fair_logloss" #"pp"
+demo_baseline = "pp" #"fair_logloss"
 noise_ratio = 0.2
 noise_list = [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]#, 0.09, 0.10]#, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20]
 
-def plot_features(noise, dataset, noise_ratio):
+def plot_features(noise, dataset, noise_ratio, feature, num_of_features):
 
     if noise==False: noise_ratio = 0.0
 
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
 
     experiment_filename = make_experiment_filename(dataset = dataset, demo_baseline= demo_baseline, lr_theta = lr_theta, num_of_demos = num_of_demos, noise_ratio = noise_ratio)
     file_dir = os.path.join(sh_obj.test_data_path)
@@ -78,8 +75,8 @@ def plot_features(noise, dataset, noise_ratio):
             ylim = max(max(demo_metric_i), y_fairll_eq_odds, y_fairll_dp , y_pp_eq_odds, y_pp_dp, newY)*1.2
             #ymin = 0, ymax = max(xs)
             # xLeft is (xlim - x)*0.8 + x
-            plt.xlabel(name[j]) #plt.xlabel(feature[j])
-            plt.ylabel(name[i]) #plt.ylabel(feature[i])
+            plt.xlabel(name[feature[j]]) #plt.xlabel(feature[j])
+            plt.ylabel(name[feature[i]]) #plt.ylabel(feature[i])
             
             plt.plot(x_test, y_test, 'Xk', label = 'superhuman_test')
             plt.plot(x, y, 'ro', label = 'superhuman_train')
@@ -130,13 +127,13 @@ def plot_features(noise, dataset, noise_ratio):
 
 
 
-def plot_noise_test(dataset):
+def plot_noise_test(dataset, feature, num_of_features):
     noise = True
     feature_gamma = np.zeros((num_of_features, len(noise_list)))
 
     for noise_idx, noise_ratio in enumerate(noise_list):
         print("noise_idx: ", noise_idx)
-        sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
+        sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
         experiment_filename = make_experiment_filename(dataset = dataset, demo_baseline = demo_baseline, lr_theta = lr_theta, num_of_demos = num_of_demos, noise_ratio = noise_ratio)
         #experiment_filename = "{}_{}_{}_{}".format(dataset, lr_theta, num_of_demos, noise_ratio).replace('.','-')
         file_dir = os.path.join(sh_obj.test_data_path)
@@ -177,14 +174,18 @@ if __name__ == "__main__":
     parser.add_argument('-t','--task', help='enter the task to do', required=True)
     parser.add_argument('-n','--noise', help='noisy demos used if True', default='False')
     parser.add_argument('-d', '--dataset', help="dataset name", required=True)
+    parser.add_argument('-f', '--features', help="features list", nargs='+', default=['inacc, dp, eqodds, prp'])
     args = vars(parser.parse_args())
     dataset = args['dataset']
     noise = eval(args['noise'])
+    feature_list = args['features']
+    feature, num_of_features = create_features_dict(feature_list)
+    print(feature_list)
 
-    if args['task'] == 'normal':
-        plot_features(noise, dataset, noise_ratio)
+    if args['task'] == 'test':
+        plot_features(noise, dataset, noise_ratio, feature, num_of_features)
 
     elif args['task'] == 'noise-test':
-        plot_noise_test(dataset)
+        plot_noise_test(dataset, feature, num_of_features)
 
     
