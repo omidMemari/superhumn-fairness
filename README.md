@@ -1,4 +1,4 @@
-# Superhuman Fair Classification via Subdominance Minimization
+# Superhuman Fair Classification
 
 This repository provides Python implementation for our paper [Superhuman Fairness](https://arxiv.org/pdf/2301.13420.pdf).
 
@@ -15,13 +15,13 @@ fairness measures. We demonstrate the benefits of this approach given suboptimal
 
 We use `main.py` to create demonstrations, train and test our model, and compare it with other baselines.
 
-First we need to create a set of reference decisions (demonstrations) from training data. `-n True` adds noise to the protected attribute and predicted label of the demonstrations.
+First, we need to create a set of reference decisions (demonstrations) from training data. `-n True` adds noise to the protected attribute and predicted label of the demonstrations.
 
 ```console
 $ python main.py -t prepare-demos -n [True|False] -d [Adult|COMPAS] 
 ```
 
-Then we train our model with a set of performance/fairness metrics. The goal is to outperform demonstrations in all those metrics with maximal frequency. We have implemented following metrics in our code:
+Then, we train our model with a set of performance/fairness metrics. The goal is to outperform demonstrations in all those metrics with maximal frequency. We have implemented following metrics in our code:
 
 * **Prediction Error** (*inacc*)
 * **Demographic Parity** (*dp*)
@@ -41,7 +41,7 @@ To train with three conflicting fairness measures (dp, eqodds, prp) and also ina
 $ python main.py -t train -n [True|False] -d [Adult|COMPAS] -f inacc dp eqodds prp
 ```
 
-To test our model and compare it with other baseline, we run:
+To test our model and compare it with other baselines, we run:
 
 ```console
 $ python main.py -t test -n [True|False] -d [Adult|COMPAS] -f inacc dp eqodds prp
@@ -52,7 +52,7 @@ To plot the results created by test command, we use `plot.py` file:
 ```console
 $ python plot.py -t test -n [True|False] -d [Adult|COMPAS] -f inacc dp eqodds prp
 ```
-To reproduce the plots related to performance of our model with varying degree of noise:
+To reproduce the plots related to performance of our model with varying degrees of noise:
 
 ```console
 $ python plot.py -t noise-test -n True -d [Adult|COMPAS] -f inacc dp eqodds prp
