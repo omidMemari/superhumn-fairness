@@ -90,6 +90,7 @@ class Super_human:
       root = "experiments"
     print("root: ", root)
     self.data_path = os.path.join(root,"data")
+    self.model_path = os.path.join(root,"model")
     self.train_data_path = os.path.join(root, "train")
     self.test_data_path = os.path.join(root, "test")
     self.plots_path = os.path.join(root,"plots")
@@ -175,8 +176,9 @@ class Super_human:
                  "Y_test": Y_test,
                  "A_str_train": A_str_train,
                  "A_str_test": A_str_test}
-
-    with open(f'base_model_{dataset}.pickle', 'wb') as handle:
+    
+    model_file_dir = os.path.join(self.model_path, 'base_model_' + dataset + '.pickle') 
+    with open(model_file_dir, 'wb') as handle:  #with open(f'base_model_{dataset}.pickle', 'wb') as handle:
         pickle.dump(self.base_dict, handle)
 
   def run_demo_baseline(self, data_demo = data_demo):
@@ -844,8 +846,10 @@ class Super_human:
     self.model_obj = self.model_params["model"]
     self.theta = self.model_params["theta"]
     self.train_eval = self.model_params["eval"]
+
+    model_file_dir = os.path.join(self.model_path, 'base_model_' + dataset + '.pickle') 
     try:
-      with open(f'base_model_{dataset}.pickle', 'rb') as handle:  # Be careful of which base_model you are reading!! We need to read base model corresponding to the training data
+      with open(model_file_dir, 'rb') as handle: #with open(f'base_model_{dataset}.pickle', 'rb') as handle:
         self.base_dict = pickle.load(handle)
         self.X_test = self.base_dict["X_test"]
         self.Y_test = self.base_dict["Y_test"]
