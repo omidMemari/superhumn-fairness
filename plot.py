@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import argparse
 import numpy as np
-from main import Super_human
+from main import Super_human, default_args
 from util import create_features_dict, make_experiment_filename, load_object, find_gamma_superhuman, find_gamma_superhuman_all
 
 
@@ -13,17 +13,17 @@ colors = {0:'orange', 1: 'red', 2: 'blue', 3:'green', 4:'black'}
 
 name = {"ZeroOne": "Prediction error", "Demographic parity difference": "D.DP", "Equalized odds difference": "D.EqOdds", "Predictive value difference": "D.PRP", "False negative rate difference": "D.FNR",  "False positive rate difference": "D.FPR", "Positive predictive value difference": "D.PPV", "Negative predictive value difference": "D.NPV", "Overall AUC": "AUC", "AUC difference": "D.AUC", "Balanced error rate difference": "D.Balanced Error Rate"}
 short = {"ZeroOne": "error", "Demographic parity difference": "DP", "D.FNR": "FNR", "D.FPR": "FPR", "Equalized odds difference": "EqOdds", "D.PPV": "PPV", "D.NPV":"NPV", "Predictive value difference":"PRP", "Balanced error rate difference": "D.ErrorRate", "Positive predictive value difference": "PPV", "Negative predictive value difference": "NPV", "Overall AUC": "AUC", "AUC difference": "D.AUC"}
-lr_theta = 0.01
+lr_theta = default_args['lr_theta']
 num_of_demos = 50
-demo_baseline = "pp" #"fair_logloss"
+#demo_baseline = "fair_logloss" #"pp"
 noise_ratio = 0.2
 noise_list = [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]#, 0.09, 0.10]#, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20]
 
-def plot_features(noise, dataset, noise_ratio, feature, num_of_features):
+def plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type):
 
     if noise==False: noise_ratio = 0.0
 
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
 
     experiment_filename = make_experiment_filename(dataset = dataset, demo_baseline= demo_baseline, lr_theta = lr_theta, num_of_demos = num_of_demos, noise_ratio = noise_ratio)
     file_dir = os.path.join(sh_obj.test_data_path)
@@ -127,13 +127,13 @@ def plot_features(noise, dataset, noise_ratio, feature, num_of_features):
 
 
 
-def plot_noise_test(dataset, feature, num_of_features):
+def plot_noise_test(dataset, feature, num_of_features, demo_baseline, base_model_type):
     noise = True
     feature_gamma = np.zeros((num_of_features, len(noise_list)))
 
     for noise_idx, noise_ratio in enumerate(noise_list):
         print("noise_idx: ", noise_idx)
-        sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
+        sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
         experiment_filename = make_experiment_filename(dataset = dataset, demo_baseline = demo_baseline, lr_theta = lr_theta, num_of_demos = num_of_demos, noise_ratio = noise_ratio)
         #experiment_filename = "{}_{}_{}_{}".format(dataset, lr_theta, num_of_demos, noise_ratio).replace('.','-')
         file_dir = os.path.join(sh_obj.test_data_path)
@@ -172,20 +172,24 @@ def plot_noise_test(dataset, feature, num_of_features):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Description of your program')
     parser.add_argument('-t','--task', help='enter the task to do', required=True)
-    parser.add_argument('-n','--noise', help='noisy demos used if True', default='False')
-    parser.add_argument('-d', '--dataset', help="dataset name", required=True)
-    parser.add_argument('-f', '--features', help="features list", nargs='+', default=['inacc, dp, eqodds, prp'])
+    parser.add_argument('-n','--noise', help='noisy demos used if True', default = default_args['noise'])
+    parser.add_argument('-d', '--dataset', help="dataset name", default = default_args['dataset'])
+    parser.add_argument('-b','--demo_baseline', help='model for creating demos', default = default_args['demo_baseline'])
+    parser.add_argument('-f', '--features', help="features list", nargs='+', default = default_args['features'])
+    parser.add_argument('-m', '--base_model_type', help="model type", default = default_args['base_model_type'])
     args = vars(parser.parse_args())
     dataset = args['dataset']
     noise = eval(args['noise'])
+    demo_baseline = args['demo_baseline']
     feature_list = args['features']
+    base_model_type = args['base_model_type']
     feature, num_of_features = create_features_dict(feature_list)
     print(feature_list)
 
     if args['task'] == 'test':
-        plot_features(noise, dataset, noise_ratio, feature, num_of_features)
+        plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type)
 
     elif args['task'] == 'noise-test':
-        plot_noise_test(dataset, feature, num_of_features)
+        plot_noise_test(dataset, feature, num_of_features, demo_baseline, base_model_type)
 
     

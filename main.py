@@ -22,26 +22,29 @@ from sklearn.linear_model import LogisticRegression
 from fairlearn.postprocessing import ThresholdOptimizer
 from util import compute_error, get_metrics_df, create_features_dict, find_gamma_superhuman, find_gamma_superhuman_all, load_object, store_object, make_demo_list_filename, make_experiment_filename
 from fair_logloss.fair_logloss import DP_fair_logloss_classifier, EOPP_fair_logloss_classifier, EODD_fair_logloss_classifier
+from model import LR_base_superhuman_model, NN_base_superhuman_model
 
 
+default_args = {'dataset': 'Adult', 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc, dp, eqodds, prp'], 'base_model_type': 'LR'}
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, 'Diabetes': {2:"Female", 1:"Male"}}
-lr_theta = 0.01
+
+lr_theta = default_args['lr_theta']
+num_of_demos = default_args['num_of_demos']
+noise_ratio = default_args['noise_ratio']
 iters = 14
-num_of_demos = 50
 alpha = 0.5
 beta = 0.5
 lamda = 0.01
-demo_baseline = "pp" #"fair_logloss" 
+#demo_baseline = "pp" #"fair_logloss" 
 model = "logistic_regression"
-noise_ratio = 0.2
 noise_list = [0.2]#0.03, 0.04]#[0.06, 0.07, 0.08, 0.09]##[0.16, 0.17, 0.18, 0.19, 0.20]#[0.11, 0.12, 0.13, 0.14, 0.15]
 
 
 class Super_human:
 
-  def __init__(self, dataset, num_of_demos, feature, num_of_features, lr_theta, noise, noise_ratio):
+  def __init__(self, dataset, num_of_demos, feature, num_of_features, lr_theta, noise, noise_ratio, demo_baseline, base_model_type):
     self.dataset = dataset
     self.num_of_demos = num_of_demos
     self.num_of_features = num_of_features
@@ -57,6 +60,7 @@ class Super_human:
     self.lr_theta = lr_theta
     self.noise_ratio = noise_ratio
     self.noise = noise
+    self.base_model_type = base_model_type
     self.demo_baseline = demo_baseline
     self.set_paths()
     self.dataset_ref = pd.read_csv(self.dataset_path, index_col=0) #self.dataset_ref = pd.read_csv('dataset_ref.csv', index_col=0)
@@ -128,7 +132,8 @@ class Super_human:
     A_train = A_train.loc[pp_train_idx]
     #################################################
 
-    self.model_obj = LogisticRegression(**self.logi_params)
+    self.model_obj = LR_base_superhuman_model() #LogisticRegression(**self.logi_params)
+    print("self.model_obj.type: ", self.model_obj.type)
     self.model_obj.fit(X_train, Y_train)
     self.pred_scores = self.model_obj.predict_proba(X_test)
 
@@ -163,8 +168,9 @@ class Super_human:
       self.pred_scores = h.predict(X_test.values,A_test.values)
       
       print("h.theta: ", h.theta)
-      self.model_obj.coef_ = self.model_obj.coef_ = np.asarray([h.theta[:-1]])
-      print("self.model_obj.coef_: ", self.model_obj.coef_)
+      self.model_obj.update_model_theta(h.theta[:-1])
+      #self.model_obj.coef_ = np.asarray([h.theta[:-1]])
+      print("self.model_obj.coef_: ", self.model_obj.get_model_theta())
 
     self.base_dict = {"model_obj": self.model_obj,
                  "pred_scores": self.pred_scores,
@@ -466,6 +472,9 @@ class Super_human:
   def sample_from_prob(self, dist, size):
 
     preds = [0.0, 1.0]
+    #print("dist: ", dist)
+    #print(sum(dist))
+    dist /= dist.sum()
     sample_preds = np.random.choice(preds, size, True, dist)
     return sample_preds
 
@@ -760,6 +769,9 @@ class Super_human:
       X = self.test_data.drop(columns=[self.label])
 
     # Scores on train set
+    #print("len(X): ", X.shape)
+    #print("len(Y): ", Y_test.shape)
+    #print("self.model_obj.predict_proba(X):", self.model_obj.predict_proba(X))
     scores = self.model_obj.predict_proba(X)[:, 1]
     # Predictions (0 or 1) on test set
     preds = (scores >= np.mean(Y_train)) * 1
@@ -771,14 +783,15 @@ class Super_human:
     eval = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str, feature = feature, is_demo = False)
     return eval
 
-  def get_model_theta(self):
-    return self.model_obj.coef_[0]
+  # def get_model_theta(self):
+  #   return self.model_obj.get_model_theta()  #self.model_obj.coef_[0]
+
+  # def update_model_theta(self, new_theta):
+  #   self.model_obj.update_model_theta(new_theta)
+  #   #self.model_obj.coef_ = np.asarray([new_theta]) # update the coefficient of our logistic regression model with the new theta
   
   def get_model_alpha(self):
     return self.alpha
-
-  def update_model_theta(self, new_theta):
-    self.model_obj.coef_ = np.asarray([new_theta]) # update the coefficient of our logistic regression model with the new theta
 
   def update_model_alpha(self, new_alpha):
     self.alpha = new_alpha
@@ -787,37 +800,69 @@ class Super_human:
   def update_model(self, lr_theta, iters):
     self.lr_theta = lr_theta
     self.grad_theta, subdom_tensor_sum_arr, self.eval, self.gamma_superhuman_arr = [], [], [], []
+    Y = self.train_data[self.label]
+    X = self.train_data.drop(columns=[self.label])
+    print("self.base_model_type: ", self.model_obj.type)
+    if self.base_model_type == 'NN':
+      self.subdom_constant = 0
+      self.sample_superhuman() # update self.sample_matrix with new samples from new theta
+      self.get_samples_demo_indexed()
+      self.get_sample_loss()
+      self.model_obj = NN_base_superhuman_model(self.demo_list, self.num_of_demos, self.num_of_features, self.subdom_constant, self.alpha, self.sample_loss)
+      self.model_obj.fit(X, Y)
     gamma_degrade = 0
     for i in tqdm(range(iters)):
       # find sample loss and store it, we will use it for computing grad_theta and grad_alpha
       self.sample_superhuman() # update self.sample_matrix with new samples from new theta
       self.get_samples_demo_indexed()
       self.get_sample_loss()
-      
-      # get the current theta and alpha
-      theta = self.get_model_theta()
       alpha = self.get_model_alpha()
-      # find new theta
-      subdom_tensor_sum, grad_theta = self.compute_grad_theta() # computer gradient of loss w.r.t theta by sampling from our model
-      new_theta = theta - self.lr_theta * grad_theta  # update theta using the gradinet values
-      # find new alpha
-      if i == 0:
-        print("eval from first sample: ")
-        print(self.eval_model(mode = "train"))
-      new_alpha = self.compute_alpha()
-      #update theta
-      self.update_model_theta(new_theta)
-      #update alpha
+
+      if isinstance(self.model_obj, LR_base_superhuman_model):
+        print("model is LR_base_superhuman_model")
+        # get the current theta and alpha
+        theta = self.model_obj.get_model_theta()
+        
+        # find new theta
+        subdom_tensor_sum, grad_theta = self.compute_grad_theta() # computer gradient of loss w.r.t theta by sampling from our model
+        new_theta = theta - self.lr_theta * grad_theta  # update theta using the gradinet values
+        # find new alpha
+        if i == 0:
+          print("eval from first sample: ")
+          print(self.eval_model(mode = "train"))
+        new_alpha = self.compute_alpha()
+        #update theta
+        self.model_obj.update_model_theta(new_theta)
+        self.grad_theta.append(grad_theta)
+        #update alpha
+        
+      elif isinstance(self.model_obj, NN_base_superhuman_model):
+        print("model is NN_base_superhuman_model")
+         # get the current theta and alpha
+        #theta = self.model_obj.get_model_theta()
+        self.model_obj.fit(X, Y)
+        # find new theta
+        #subdom_tensor_sum, grad_theta = self.compute_grad_theta() # computer gradient of loss w.r.t theta by sampling from our model
+        #new_theta = theta - self.lr_theta * grad_theta  # update theta using the gradinet values
+        # find new alpha
+        if i == 0:
+          print("eval from first sample: ")
+          print(self.eval_model(mode = "train"))
+        new_alpha = self.compute_alpha()
+        subdom_tensor_sum = 0 #########
+        #update theta
+        #self.model_obj.update_model_theta(new_theta)
+        #update alpha
+
       self.update_model_alpha(new_alpha)
       # eval model
       eval_i = self.eval_model(mode = "train")
       print("eval_i:")
       print(eval_i)
       # store some stuff
-      self.grad_theta.append(grad_theta)
       subdom_tensor_sum_arr.append(subdom_tensor_sum)
       self.eval.append(eval_i)
-      model_params = {"model":self.model_obj, "theta": self.model_obj.coef_, "alpha":self.alpha, "eval": self.eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features, "demo_baseline": self.demo_baseline, "feature": self.feature}
+      model_params = {"model":self.model_obj, "theta": self.model_obj.get_model_theta(), "alpha":self.alpha, "eval": self.eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features, "demo_baseline": self.demo_baseline, "feature": self.feature}
       gamma_superhuman = find_gamma_superhuman(self.demo_list, model_params)
       self.gamma_superhuman_arr.append(gamma_superhuman)
       print("gamma_superhuman: ")
@@ -896,35 +941,41 @@ class Super_human:
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Description of your program')
   parser.add_argument('-t','--task', help='enter the task to do', required=True)
-  parser.add_argument('-n','--noise', help='noisy demos used if True', default='False')
-  parser.add_argument('-d', '--dataset', help="dataset name", required=True)
-  parser.add_argument('-f', '--features', help="features list", nargs='+', default=['inacc, dp, eqodds, prp'])
+  parser.add_argument('-n','--noise', help='noisy demos used if True', default = default_args['noise'])
+  parser.add_argument('-d', '--dataset', help="dataset name", default = default_args['dataset'])
+  parser.add_argument('-b','--demo_baseline', help='model for creating demos', default = default_args['demo_baseline'])
+  parser.add_argument('-f', '--features', help="features list", nargs='+', default = default_args['features'])
+  parser.add_argument('-m', '--base_model_type', help="model type", default = default_args['base_model_type'])
   
   args = vars(parser.parse_args())
+
+  print(args)
   
   dataset = args['dataset']
   feature_list = args['features']
+  demo_baseline = args['demo_baseline']
+  base_model_type = args['base_model_type']
   feature, num_of_features = create_features_dict(feature_list)
-  print(feature_list)
+  print("features: ", feature_list)
   noise = eval(args['noise'])
   print("dataset: ", dataset)
   if noise==False:
     noise_ratio = 0.0
   
   if args['task'] == 'prepare-demos':
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
     #sh_obj.base_model()
     sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta) # this alpha is different from self.alpha
 
   elif args['task'] == 'train':
     print("lr_theta: ", lr_theta)
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
     sh_obj.base_model()
     sh_obj.read_demo_list()
     sh_obj.update_model(lr_theta, iters)
 
   elif args['task'] == 'test':
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
     #sh_obj.base_model()
     sh_obj.read_model_from_file()
     sh_obj.test_model()
@@ -932,7 +983,7 @@ if __name__ == "__main__":
   elif args['task'] == 'noise-test':
     noise = True
     for noise_ratio in noise_list:
-      sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio)
+      sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
       sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta)
       sh_obj.base_model()
       sh_obj.read_demo_list()
