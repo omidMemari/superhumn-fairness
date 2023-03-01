@@ -5,7 +5,7 @@ This repository provides Python implementation for our paper [Superhuman Fairnes
 ### Abstract
 
 The fairness of machine learning-based decisions has become an increasingly important focus in the design of supervised machine learning methods. Most fairness approaches optimize a specified trade-off between performance measure(s) (e.g., accuracy, log loss, or AUC) and fairness metric(s) (e.g., demographic parity, equalized odds).
-This begs the question: are the right performancefairness trade-offs being specified? We instead recast fair machine learning as an imitation learning
+This begs the question: are the right performance fairness trade-offs being specified? We instead recast fair machine learning as an imitation learning
 task by introducing superhuman fairness, which seeks to simultaneously outperform human decisions on multiple predictive performance and
 fairness measures. We demonstrate the benefits of this approach given suboptimal decisions.
 
