@@ -26,9 +26,9 @@ from model import LR_base_superhuman_model, NN_base_superhuman_model
 
 
 default_args = {'dataset': 'Adult', 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc, dp, eqodds, prp'], 'base_model_type': 'LR'}
-label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label'}
-protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender'}
-protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, 'Diabetes': {2:"Female", 1:"Male"}}
+label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label', 'acs_west_income':, 'acs_west_insurance':, 'acs_west_mobility':, 'acs_west_poverty':, 'acs_west_public': , 'acs_west_travel':}
+protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender', 'acs_west_income':, 'acs_west_insurance':, 'acs_west_mobility':, 'acs_west_poverty':, 'acs_west_public': , 'acs_west_travel':}
+protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, 'Diabetes': {2:"Female", 1:"Male"}, 'acs_west_income':, 'acs_west_insurance':, 'acs_west_mobility':, 'acs_west_poverty':, 'acs_west_public': , 'acs_west_travel':}
 
 lr_theta = default_args['lr_theta']
 num_of_demos = default_args['num_of_demos']
