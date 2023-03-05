@@ -29,6 +29,7 @@ def main():
     folks = [ACSIncomePovertyRatio, ACSMobility, ACSIncome, ACSHealthInsurance,
              ACSPublicCoverage, ACSTravelTime, ACSIncomePovertyRatio, ACSEmployment]
     definition_df = data_source.get_definitions(download=True)
+    f = open('to_main.txt', 'w')
     for i in range(len(acss)):
         acs_task, task_name, seed = folks[i], acss[i], param[i]
         #pprint(inspect.getmembers(acs_task))
@@ -51,6 +52,24 @@ def main():
         # process dataA and dataY
         dataA = dataA.apply(lambda x: x.astype('category').cat.codes)
         dataY = dataY.apply(lambda x: x.astype('category').cat.codes)
+        
+            # get name of column A
+        f.write("task_name: ")
+        f.write('{}'.format(task_name))
+        f.write("\n")
+        f.write("protected attribute: ")
+        f.write('\n')
+        f.write('{}'.format(dataA.columns[0]))
+        f.write("unique values: ")
+        f.write('{}'.format(dataA[dataA.columns[0]].unique()))
+        f.write('\n')
+        # get name of column Y
+        f.write("label: ")
+        f.write('{}'.format(dataY.columns[0]))
+        f.write("unique values: ")
+        f.write('{}'.format(dataY[dataY.columns[0]].unique()))
+        f.write('\n\n')
+            
         df = create_dataset_ref(dataX, dataA, dataY)
         # # create folder with task_name if not exist
         if not os.path.exists('{}'.format(task_name)):
