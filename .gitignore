@@ -5,3 +5,4 @@ dataset/Diabetes/*
 base_model_Diabetes.pickle
 experiments/test/test_data_Diabetes_fair_logloss_0-01_50_0-0.csv
 experiments/train/train_data_Diabetes_fair_logloss_0-01_50_0-0.csv
+data
