@@ -1,5 +1,6 @@
 experiments/data/*
 experiments/noise/data/*
+experiments/model/*
 MFOpt-master
 dataset/Diabetes/*
 base_model_Diabetes.pickle
