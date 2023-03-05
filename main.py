@@ -23,12 +23,64 @@ from fairlearn.postprocessing import ThresholdOptimizer
 from util import compute_error, get_metrics_df, create_features_dict, find_gamma_superhuman, find_gamma_superhuman_all, load_object, store_object, make_demo_list_filename, make_experiment_filename
 from fair_logloss.fair_logloss import DP_fair_logloss_classifier, EOPP_fair_logloss_classifier, EODD_fair_logloss_classifier
 from model import LR_base_superhuman_model, NN_base_superhuman_model
+"""
+task_name: acs_west_poverty
+protected attribute: RAC1P
+unique values: [0 1] // 0 us White, 1 is Black
+label: POVPIP
+unique values: [1 0]
 
+task_name: acs_west_mobility
+protected attribute: RAC1P
+unique values: [0 1]
+label: MIG
+unique values: [1 0]
 
+task_name: acs_west_income
+protected attribute: RAC1P
+unique values: [0 1]
+label: PINCP
+unique values: [0 1]
+
+task_name: acs_west_insurance
+protected attribute: RAC1P
+unique values: [0 1]
+label: HINS2
+unique values: [0 1]
+
+task_name: acs_west_public
+protected attribute: RAC1P
+unique values: [0 1]
+label: PUBCOV
+unique values: [0 1]
+
+task_name: acs_west_travel
+protected attribute: RAC1P
+unique values: [0 1]
+label: JWMNP
+unique values: [0 1]
+
+task_name: acs_west_poverty
+protected attribute: RAC1P
+unique values: [0 1]
+label: POVPIP
+unique values: [1 0]
+
+task_name: acs_west_employment
+protected attribute: RAC1P
+unique values: [0 1]
+label: ESR
+unique values: [0 1]
+
+"""
 default_args = {'dataset': 'Adult', 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc, dp, eqodds, prp'], 'base_model_type': 'LR'}
-label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label'}
-protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender'}
-protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, 'Diabetes': {2:"Female", 1:"Male"}}
+label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label', 'acs_west_poverty': 'POVPIP', 'acs_west_mobility': 'MIG', 'acs_west_income': 'PINCP', 'acs_west_insurance': 'HINS2', 'acs_west_public': 'PUBCOV', 'acs_west_travel': 'JWMNP', 'acs_west_employment': 'ESR'}
+protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender', 'acs_west_poverty': 'RAC1P', 'acs_west_mobility': 'RAC1P', 'acs_west_income': 'RAC1P', 'acs_west_insurance': 'RAC1P', 'acs_west_public': 'RAC1P', 'acs_west_travel': 'RAC1P', 'acs_west_employment': 'RAC1P'}
+protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, \
+  'Diabetes': {2:"Female", 1:"Male"},\
+  'acs_west_poverty': {0:'White', 1:'Black'}, 'acs_west_mobility': {0:'White', 1:'Black'},\
+  'acs_west_income': {0:'White', 1:'Black'}, 'acs_west_insurance': {0:'White', 1:'Black'},\
+  'acs_west_public': {0:'White', 1:'Black'}, 'acs_west_travel': {0:'White', 1:'Black'}, 'acs_west_employment': {0:'White', 1:'Black'}}
 
 lr_theta = default_args['lr_theta']
 num_of_demos = default_args['num_of_demos']
