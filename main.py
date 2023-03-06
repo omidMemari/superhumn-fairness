@@ -250,8 +250,10 @@ class Super_human:
     #Super_human.model_name = model
 
     if self.demo_baseline == "pp":
+      print("running demo baseline: pp")
       model_logi = LogisticRegression(**self.logi_params)
       model_logi.fit(X_train, Y_train)
+      print("finish logi regression")
       # Post-processing
       self.postprocess_est = ThresholdOptimizer(
           estimator=model_logi,
@@ -259,10 +261,13 @@ class Super_human:
           predict_method='auto',
           objective = 'balanced_accuracy_score',
           prefit=True)
+      print("finish postprocess_est")
       # Balanced data set is obtained by sampling the same number of points from the majority class (Y=0)
       # as there are points in the minority class (Y=1)
       if self.dataset != 'Diabetes':
         balanced_idx1 = X_train[Y_train==1].index
+        print("balanced_idx1: ", balanced_idx1)
+        # exit()
         pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
         X_train = X_train.loc[pp_train_idx, :]
         Y_train = Y_train.loc[pp_train_idx]
@@ -359,6 +364,7 @@ class Super_human:
     return new_demo
 
   def prepare_test_pp(self, model = "logistic_regression", alpha = 0.5, beta = 0.5):
+  
     self.dataset_ref = pd.read_csv(self.dataset_path, index_col=0) #self.dataset_ref = pd.read_csv('dataset_ref.csv', index_col=0)
     dataset_ref = self.dataset_ref.copy(deep=True)
     # convert dataset_ref[senitive_feature] to int
@@ -373,8 +379,10 @@ class Super_human:
     A_str = A.map(self.dict_map)
     Y = dataset_ref[self.label]
     idx = dataset_ref.index.tolist()
-    X = dataset_ref.drop(columns=[self.label])
     
+    X = dataset_ref.drop(columns=[self.label])
+    # print(X)
+    # exit()
     df_train, df_test, Y_train, Y_test, A_train, A_test, A_str_train, A_str_test, idx_train, idx_test = train_test_split(
         X,
         Y,
@@ -391,16 +399,18 @@ class Super_human:
     
     train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
-
+    print("u running 5?")
+    print(train_file_path)
+    print(train_data_filename)
     test_data_filename = "test_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     test_file_path = os.path.join(self.test_data_path, test_data_filename)
+    
 
     dataset_pp.to_csv(train_file_path)
     dataset_sh.to_csv(test_file_path)
     
     dataset_pp_copy = dataset_pp.copy(deep=True)
-
-   
+    
     
     for i in range(self.num_of_demos):
       r = random.randint(0, 10000000)
@@ -412,9 +422,10 @@ class Super_human:
       new_demo = self.split_data(model, alpha=beta, dataset=dataset_temp,  mode="post-processing")
       if self.noise == True:
         new_demo = self.add_noise_new(new_demo)
-      
+      print("rnning metrics")
       metrics = self.run_demo_baseline(data_demo = new_demo) #self.run_logistic_pp(model = model, data_demo = new_demo)
       #if self.noise == True and metrics[self.demo_baseline]["Demographic parity difference"]
+      # exit()
       print("demo metrics: ")
       print(metrics)
       print("-----------------------------------")
