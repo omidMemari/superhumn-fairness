@@ -36,6 +36,9 @@ def make_demo_list_filename(**kwargs):
 
 def store_object(obj,path, name):
     filepath = os.path.join(path,name)
+    # check if the path exists
+    if not os.path.exists(path):
+        os.makedirs(path)
     with open(filepath, 'wb') as file:
         pickle.dump(obj,file)
     print("Record wrote to {}".format(filepath))
