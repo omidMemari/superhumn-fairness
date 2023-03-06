@@ -13,6 +13,7 @@ import inspect
 def create_dataset_ref(dataX, dataA, dataY):
     df = pd.concat([pd.DataFrame(dataX), pd.DataFrame(
         dataA), pd.DataFrame(dataY)], axis=1)
+    df.reset_index(inplace=True)
     return df
 
 
