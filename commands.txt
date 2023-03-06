@@ -8,3 +8,7 @@ git push -u origin main
 
 python main.py -t [prepare-demos|train|test] -n [True|False] -d [Adult|COMPAS] -f inacc dp eqodds prp
 python main.py -t [test|noise-test] -n [True|False] -d [Adult|COMPAS] -f inacc dp eqodds prp
+
+python3 main.py -t prepare-demos  -n False -d acs_west_income -f inacc dp eqodds prp
+python main.py -t train -n False -d acs_west_income -f inacc dp eqodds prp
+python main.py -t test  -n False -d acs_west_income -f inacc dp eqodds prp
