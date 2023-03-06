@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
 import os
-from sklearn import preprocessing
+from folktables import ACSDataSource, ACSEmployment, ACSIncomePovertyRatio, ACSMobility, ACSIncome, ACSHealthInsurance, ACSPublicCoverage, ACSTravelTime, generate_categories
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 from folktables import ACSDataSource, ACSEmployment, ACSIncomePovertyRatio, ACSMobility, ACSIncome, ACSHealthInsurance, ACSPublicCoverage, ACSTravelTime
 
 
@@ -26,7 +28,8 @@ def main():
     param = [128, 4, 8, 16, 32, 64, 128, 256]
     folks = [ACSIncomePovertyRatio, ACSMobility, ACSIncome, ACSHealthInsurance,
              ACSPublicCoverage, ACSTravelTime, ACSIncomePovertyRatio, ACSEmployment]
-
+    definition_df = data_source.get_definitions(download=True)
+    f = open('to_main.txt', 'w')
     for i in range(len(acss)):
         acs_task, task_name, seed = folks[i], acss[i], param[i]
         #pprint(inspect.getmembers(acs_task))
@@ -35,21 +38,42 @@ def main():
         groups_to_keep = [1, 2]
         acs_data = acs_data.loc[acs_data[group_var].isin(groups_to_keep)]
         dataX, dataY, dataA = acs_task.df_to_pandas(acs_data)
-        columnsX = dataX.columns
-        columnsY = dataY.columns
-        columnsA = dataA.columns
-        print(dataX.head())
-        dataX = preprocessing.normalize(dataX)
-        dataA = np.where(dataA == 1, 0, 1)
-        dataY = np.where(dataY == 1, 0, 1)
-        dataX = pd.DataFrame(dataX, columns=columnsX)
-        dataA = pd.DataFrame(dataA, columns=columnsA)
-        dataY = pd.DataFrame(dataY, columns=columnsY)
+        # taking catoegorical features        
+        categories = generate_categories(features=acs_task.features, definition_df=definition_df)
+        categories_cols = categories.keys()
+        # taking non-categorical features
+        non_categorical_cols = [col for col in dataX.columns if col not in categories_cols]
+        dataX[non_categorical_cols] = dataX[non_categorical_cols].astype(float)
+        # use standard scaler to scale non_categorical_cols
+        pipe = Pipeline([('scaler', StandardScaler())])
+        dataX[non_categorical_cols] = pipe.fit_transform(dataX[non_categorical_cols])
+        # use one-hot encoding to encode categorical_cols
+        dataX = pd.get_dummies(dataX, columns=categories_cols)
+        # process dataA and dataY
+        dataA = dataA.apply(lambda x: x.astype('category').cat.codes)
+        dataY = dataY.apply(lambda x: x.astype('category').cat.codes)
+        
+            # get name of column A
+        f.write("task_name: ")
+        f.write('{}'.format(task_name))
+        f.write("\n")
+        f.write("protected attribute: ")
+        f.write('\n')
+        f.write('{}'.format(dataA.columns[0]))
+        f.write("unique values: ")
+        f.write('{}'.format(dataA[dataA.columns[0]].unique()))
+        f.write('\n')
+        # get name of column Y
+        f.write("label: ")
+        f.write('{}'.format(dataY.columns[0]))
+        f.write("unique values: ")
+        f.write('{}'.format(dataY[dataY.columns[0]].unique()))
+        f.write('\n\n')
+            
         df = create_dataset_ref(dataX, dataA, dataY)
-        # create folder with task_name if not exist
+        # # create folder with task_name if not exist
         if not os.path.exists('{}'.format(task_name)):
             os.makedirs('{}'.format(task_name))
         path = '{}/dataset_ref.csv'.format(task_name)
         df.to_csv(path, index=False)
-        print(df.head())
 main()
