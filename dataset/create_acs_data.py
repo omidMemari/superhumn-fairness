@@ -76,5 +76,7 @@ def main():
         if not os.path.exists('{}'.format(task_name)):
             os.makedirs('{}'.format(task_name))
         path = '{}/dataset_ref.csv'.format(task_name)
+        # df = df.to_numpy()
+        # np.savetxt(path, df, delimiter=",")
         df.to_csv(path, index=False)
 main()
