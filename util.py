@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import pickle
 import os
+
 # Metrics
 from fairlearn.metrics import (
     MetricFrame,
@@ -34,15 +35,41 @@ def make_demo_list_filename(**kwargs):
     return "demo_list_{}_{}_{}_{}".format(kwargs['dataset'], kwargs['demo_baseline'],  kwargs['num_of_demos'], kwargs['noise_ratio']).replace('.','-')
 
 
-def store_object(obj,path, name):
+def store_object(obj, path, name, exp_idx):
     filepath = os.path.join(path,name)
-    with open(filepath, 'wb') as file:
-        pickle.dump(obj,file)
-    print("Record wrote to {}".format(filepath))
+    from main import default_args
+    if exp_idx == -1 or exp_idx == 0:
+        with open(filepath, 'wb') as file:
+            pickle.dump(obj,file)
+        print("exp {} wrote to {}".format(exp_idx, filepath))
+    elif exp_idx > 0 and exp_idx <  default_args['num_experiment'] - 1:
+        with open(filepath, 'ab+') as file:
+            #file = open(filepath, 'wb')
+            pickle.dump(obj,file)
+        print("exp {} wrote to {}".format(exp_idx, filepath))
+    elif exp_idx == default_args['num_experiment'] - 1:
+        with open(filepath, 'ab+') as file:
+            #file = open(filepath, 'ab+')
+            pickle.dump(obj, file)
+        #file.close()
+        print("exp {} wrote to {}".format(exp_idx, filepath))
 
-def load_object(path,name):
-    with open(os.path.join(path,name), 'rb') as file:
-        return pickle.load(file)
+        
+
+def load_object(path, name, exp_num):
+    if exp_num == -1:
+        with open(os.path.join(path,name), 'rb') as file:
+            return pickle.load(file)
+    elif exp_num > -1:
+        data = []
+        with open(os.path.join(path, name), 'rb') as file:
+            try:
+                while True:
+                    data.append(pickle.load(file))
+            except EOFError:
+                pass
+        return data
+
 
 def find_gamma_superhuman_all(demo_list, model_params):
   if not model_params: return
