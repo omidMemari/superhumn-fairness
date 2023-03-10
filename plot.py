@@ -8,27 +8,23 @@ from main import Super_human, default_args
 from util import create_features_dict, make_experiment_filename, load_object, find_gamma_superhuman, find_gamma_superhuman_all
 
 
-markers = {0:"o", 1: "*", 2: "x", 3:"<", 4:"v"}
-colors = {0:'orange', 1: 'red', 2: 'blue', 3:'green', 4:'black'}
+baselines = {'eval_sh', 'eval_pp_dp', 'eval_pp_eq_odds', 'eval_fairll_dp', 'eval_fairll_eqodds'}
+marker = {'eval_sh':'X', 'eval_pp_dp':'o', 'eval_pp_eq_odds':'o', 'eval_fairll_dp':'P', 'eval_fairll_eqodds':'P', 'MFOpt':'h'}
+color = {'eval_sh':'k', 'eval_pp_dp':'b', 'eval_pp_eq_odds':'g', 'eval_fairll_dp':'darkcyan', 'eval_fairll_eqodds':'indigo', 'MFOpt':'m'}
+label = {'eval_sh':'superhuman_test', 'eval_pp_dp':'post_proc_dp', 'eval_pp_eq_odds':'post_proc_eqodds', 'eval_fairll_dp':'fair_logloss_dp', 'eval_fairll_eqodds':'fair_logloss_eqodds', 'MFOpt':'MFOpt'}
 
 name = {"ZeroOne": "Prediction error", "Demographic parity difference": "D.DP", "Equalized odds difference": "D.EqOdds", "Predictive value difference": "D.PRP", "False negative rate difference": "D.FNR",  "False positive rate difference": "D.FPR", "Positive predictive value difference": "D.PPV", "Negative predictive value difference": "D.NPV", "Overall AUC": "AUC", "AUC difference": "D.AUC", "Balanced error rate difference": "D.Balanced Error Rate"}
 short = {"ZeroOne": "error", "Demographic parity difference": "DP", "D.FNR": "FNR", "D.FPR": "FPR", "Equalized odds difference": "EqOdds", "D.PPV": "PPV", "D.NPV":"NPV", "Predictive value difference":"PRP", "Balanced error rate difference": "D.ErrorRate", "Positive predictive value difference": "PPV", "Negative predictive value difference": "NPV", "Overall AUC": "AUC", "AUC difference": "D.AUC"}
 lr_theta = default_args['lr_theta']
-num_of_demos = 50
+num_of_demos = default_args['num_of_demos']
 #demo_baseline = "fair_logloss" #"pp"
-noise_ratio = 0.2
+noise_ratio = default_args['noise_ratio']
+num_experiment = default_args['num_experiment']
 noise_list = [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]#, 0.09, 0.10]#, 0.11, 0.12, 0.13, 0.14, 0.15, 0.16, 0.17, 0.18, 0.19, 0.20]
 
-def plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type):
+def plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type, model_params, sh_obj):
 
-    if noise==False: noise_ratio = 0.0
-
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
-
-    experiment_filename = make_experiment_filename(dataset = dataset, demo_baseline= demo_baseline, lr_theta = lr_theta, num_of_demos = num_of_demos, noise_ratio = noise_ratio)
-    file_dir = os.path.join(sh_obj.test_data_path)
-    model_params = load_object(file_dir,experiment_filename)
-
+    #sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
 
     demo_list = sh_obj.read_demo_list()
     alpha = model_params["alpha"]
@@ -65,8 +61,8 @@ def plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_ba
             x_fairll_eq_opp = model_params['eval_fairll_eqopp'].loc[feature[j]][0]
             y_fairll_eq_opp = model_params['eval_fairll_eqopp'].loc[feature[i]][0]
             ### MFOpt
-            x_mfopt = model_params['eval_MFOpt'].loc[feature[j]][0]
-            y_mfopt = model_params['eval_MFOpt'].loc[feature[i]][0]
+            #x_mfopt = model_params['eval_MFOpt'].loc[feature[j]][0]
+            #y_mfopt = model_params['eval_MFOpt'].loc[feature[i]][0]
             
 
             newX = x + alpha[j]
@@ -83,7 +79,7 @@ def plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_ba
             #plt.scatter(demo_metric_j, demo_metric_i, marker='*', c=[(255/255,211/255,107/255)], label = 'post_proc_demos')
             plt.scatter(demo_metric_j, demo_metric_i, marker='*', c='orange', label = 'post_proc_demos')
             # plot MFOpt
-            plt.plot(x_mfopt, y_mfopt, 'hm', label = 'MFOpt')
+            #plt.plot(x_mfopt, y_mfopt, 'hm', label = 'MFOpt')
             # plot post-processing
             plt.plot(x_pp_dp, y_pp_dp, 'bo', label = 'post_proc_dp')
             plt.plot(x_pp_eq_odds, y_pp_eq_odds, 'go', label = 'post_proc_eqodds')
@@ -125,6 +121,89 @@ def plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_ba
             plots_path_dir = os.path.join(sh_obj.plots_path, plot_file_name) # short[feature[j]] + "_vs_"+ short[feature[i]] + ".png")
             plt.savefig(plots_path_dir)
 
+
+def plot_features_errorbars(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type, model_params, sh_obj):
+
+    std_coef  = 1.96/np.sqrt(num_experiment)
+    demo_list = sh_obj.read_demo_list()
+    alpha = model_params[0]["alpha"]
+    print("alpha: ", alpha)
+    margin = [1 / x for x in alpha]
+    print("margin: ", margin)
+    print(len(model_params))
+    print("num_experiment: ", num_experiment)
+    
+    #find_gamma_superhuman(demo_list, model_params[0])
+    #find_gamma_superhuman_all(demo_list, model_params[0])
+
+    for i in range(num_of_features):
+        for j in range(i+1, num_of_features):
+            demo_metric_i = [demo_list[z].metric[i] for z in range(len(demo_list))]
+            demo_metric_j = [demo_list[z].metric[j] for z in range(len(demo_list))]
+            f1 = plt.figure()
+            ### our model
+            x = model_params[0]['eval'][-1].loc[feature[j]][0]
+            y = model_params[0]['eval'][-1].loc[feature[i]][0]
+            plts_data = {}
+            for method in baselines:
+                plts_data[method] = {}
+                plts_data[method]['x'], plts_data[method]['y'] = [], []
+                for k in range(num_experiment):
+                    plts_data[method]['x'].append(model_params[k][method].loc[feature[j]][0])
+                    plts_data[method]['y'].append(model_params[k][method].loc[feature[i]][0])
+                
+                plts_data[method]['x_mean'] = np.mean(plts_data[method]['x'])
+                plts_data[method]['y_mean'] = np.mean(plts_data[method]['y'])
+                plts_data[method]['x_err'] = np.std(plts_data[method]['x']) * std_coef
+                plts_data[method]['y_err'] = np.std(plts_data[method]['y']) * std_coef
+            
+
+            newX = x + margin[j]
+            newY = y + margin[i]
+
+            xlim = max(max(demo_metric_j), max([plts_data[method]['x_mean'] for method in baselines]), newX)*1.2
+            ylim = max(max(demo_metric_i), max([plts_data[method]['y_mean'] for method in baselines]), newY)*1.2
+            
+            plt.xlabel(name[feature[j]]) 
+            plt.ylabel(name[feature[i]])
+
+            plt.plot(x, y, 'ro', label = 'superhuman_train')
+            
+            plt.scatter(demo_metric_j, demo_metric_i, marker='*', c='orange', label = 'post_proc_demos')
+
+            for method in baselines:
+                plt.errorbar(plts_data[method]['x_mean'], plts_data[method]['y_mean'], xerr = plts_data[method]['x_err'], yerr = plts_data[method]['y_err'],  marker= marker[method], color = color[method], label = label[method])
+                print()
+                print("{}: ".format(method))
+                print("{}: {} + {}".format(feature[j], plts_data[method]['x_mean'], plts_data[method]['x_err']))
+                print("{}: {} + {}".format(feature[i], plts_data[method]['y_mean'], plts_data[method]['y_err']))
+                print()
+            
+            xmin, xmax, ymin, ymax = plt.axis()
+        
+            yLeft = (ylim - y)*0.8 + y
+            xBottom = (xlim - x)*0.8 + x
+            plt.plot([x, x], [y, ylim], 'r')
+            plt.plot([x, xlim], [y, y], 'r')
+            plt.plot([newX, newX], [newY, ylim], 'r--')
+            plt.plot([newX, xlim], [newY, newY], 'r--')
+            plt.annotate('', xy=(newX, yLeft), xytext=(x, yLeft), xycoords='data', textcoords='data',
+                        arrowprops={'arrowstyle': '<->'})
+            # write the text to the top of the arrow above
+            plt.text((newX + x) * 0.5, yLeft, fr"$1/\alpha_{{{short[feature[j]]}}}$", horizontalalignment='center', verticalalignment='bottom')
+            plt.annotate('', xy=(xBottom, newY), xytext=(xBottom, y), xycoords='data', textcoords='data',
+                        arrowprops={'arrowstyle': '<->'})
+            # write the text to the right of the arrow above
+            plt.text(xBottom, (newY + y) * 0.5,
+                    fr"$1/\alpha_{{{short[feature[i]]}}}$", horizontalalignment='left', verticalalignment='center')
+            
+            handles, labels = plt.gca().get_legend_handles_labels()
+            plt.grid(True)
+            plt.legend(reversed(handles), reversed(labels),loc='best', ncol=1, fontsize="small")
+            plt.title(dataset)
+            plot_file_name = "errbar_" + short[feature[j]] + "_vs_" + short[feature[i]] + "_{}_{}_{}".format(dataset, model_params[0]['demo_baseline'], noise_ratio).replace('.','-') + ".pdf"
+            plots_path_dir = os.path.join(sh_obj.plots_path, plot_file_name)
+            plt.savefig(plots_path_dir)
 
 
 def plot_noise_test(dataset, feature, num_of_features, demo_baseline, base_model_type):
@@ -187,9 +266,32 @@ if __name__ == "__main__":
     print(feature_list)
 
     if args['task'] == 'test':
-        plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type)
+        # experiment_filename = make_experiment_filename(dataset = dataset, demo_baseline= demo_baseline, lr_theta = lr_theta, num_of_demos = num_of_demos, noise_ratio = noise_ratio)
+        # file_dir = os.path.join(sh_obj.test_data_path)
+        # model_params = load_object(file_dir,experiment_filename, -1)
+        # plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type, model_params)
+        if noise==False: noise_ratio = 0.0
+        sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
+        experiment_filename = make_experiment_filename(dataset = dataset, demo_baseline= demo_baseline, lr_theta = lr_theta, num_of_demos = num_of_demos, noise_ratio = noise_ratio)
+        file_dir = os.path.join(sh_obj.test_data_path)
+        model_params = [load_object(file_dir,experiment_filename, -1)]
+        print("len(model_params): ", len(model_params))
+        print(model_params)
+        plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type, model_params, sh_obj)
+
+    elif args['task'] == 'test-errorbars':
+        if noise==False: noise_ratio = 0.0
+        sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
+        experiment_filename = make_experiment_filename(dataset = dataset, demo_baseline= demo_baseline, lr_theta = lr_theta, num_of_demos = num_of_demos, noise_ratio = noise_ratio)
+        file_dir = os.path.join(sh_obj.test_data_path)
+        model_params = load_object(file_dir,experiment_filename, num_experiment)
+        print("len(model_params): ", len(model_params))
+        #print(model_params)
+        plot_features_errorbars(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type, model_params, sh_obj)
+        
 
     elif args['task'] == 'noise-test':
         plot_noise_test(dataset, feature, num_of_features, demo_baseline, base_model_type)
+
 
     
