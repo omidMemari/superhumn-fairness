@@ -73,7 +73,7 @@ label: ESR
 unique values: [0 1]
 
 """
-default_args = {'dataset': 'Adult', 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc, dp, eqodds, prp'], 'base_model_type': 'LR'}
+default_args = {'dataset': 'Adult', 'iters': 30, 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.0001, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc, dp, eqodds, prp'], 'base_model_type': 'LR', 'num_experiment': 10}
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label', 'acs_west_poverty': 'POVPIP', 'acs_west_mobility': 'MIG', 'acs_west_income': 'PINCP', 'acs_west_insurance': 'HINS2', 'acs_west_public': 'PUBCOV', 'acs_west_travel': 'JWMNP', 'acs_west_employment': 'ESR'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender', 'acs_west_poverty': 'RAC1P', 'acs_west_mobility': 'RAC1P', 'acs_west_income': 'RAC1P', 'acs_west_insurance': 'RAC1P', 'acs_west_public': 'RAC1P', 'acs_west_travel': 'RAC1P', 'acs_west_employment': 'RAC1P'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, \
@@ -85,10 +85,10 @@ protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'A
 lr_theta = default_args['lr_theta']
 num_of_demos = default_args['num_of_demos']
 noise_ratio = default_args['noise_ratio']
-iters = 14
+iters = default_args['iters']
 alpha = 0.5
 beta = 0.5
-lamda = 0.01
+lamda = 0.001
 #demo_baseline = "pp" #"fair_logloss" 
 model = "logistic_regression"
 noise_list = [0.2]#0.03, 0.04]#[0.06, 0.07, 0.08, 0.09]##[0.16, 0.17, 0.18, 0.19, 0.20]#[0.11, 0.12, 0.13, 0.14, 0.15]
@@ -266,7 +266,7 @@ class Super_human:
       # as there are points in the minority class (Y=1)
       if self.dataset != 'Diabetes':
         balanced_idx1 = X_train[Y_train==1].index
-        print("balanced_idx1: ", balanced_idx1)
+        #print("balanced_idx1: ", balanced_idx1)
         # exit()
         pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
         X_train = X_train.loc[pp_train_idx, :]
@@ -439,7 +439,7 @@ class Super_human:
 
     file_dir = os.path.join(self.data_path)
     demo_list_filename = make_demo_list_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
-    store_object(self.demo_list, file_dir, demo_list_filename)
+    store_object(self.demo_list, file_dir, demo_list_filename, -1)
 
   def save_AXY(self, A_train, X_train, Y_train, A_test, X_test, Y_test):
 
@@ -524,7 +524,7 @@ class Super_human:
     demo_list_filename = make_demo_list_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     print("demo_list file name: ")
     print(demo_list_filename)
-    self.demo_list = load_object(file_dir, demo_list_filename)
+    self.demo_list = load_object(file_dir, demo_list_filename, -1)
     
     return self.demo_list
 
@@ -944,13 +944,13 @@ class Super_human:
     #model_params = {"model":self.model_obj, "theta": self.model_obj.coef_, "alpha":self.alpha, "eval": self.eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features}
     experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     file_dir = os.path.join(self.train_data_path)
-    store_object(self.model_params, file_dir, experiment_filename)
+    store_object(self.model_params, file_dir, experiment_filename, -1)
 
 
   def read_model_from_file(self):
     experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     file_dir = os.path.join(self.train_data_path)
-    self.model_params = load_object(file_dir,experiment_filename)
+    self.model_params = load_object(file_dir,experiment_filename, -1)
     self.model_obj = self.model_params["model"]
     self.theta = self.model_params["theta"]
     self.train_eval = self.model_params["eval"]
@@ -967,38 +967,41 @@ class Super_human:
       self.base_model()
 
 
-  def test_model(self):
+  def test_model(self, exp_idx):
     eval_sh = self.eval_model(mode = "test-sh")
-    eval_pp_dp = self.eval_model_baseline(baseline = "pp", mode = "demographic_parity")
-    eval_pp_eqodds = self.eval_model_baseline(baseline = "pp", mode = "equalized_odds")
-    eval_fairll_dp = self.eval_model_baseline(baseline = "fair_logloss", mode = "demographic_parity")
-    eval_fairll_eqodds = self.eval_model_baseline(baseline = "fair_logloss", mode = "equalized_odds")
-    eval_fairll_eqopp = self.eval_model_baseline(baseline = "fair_logloss", mode = "equalized_opportunity")
-    eval_MFOpt = self.eval_model_baseline(baseline = "MFOpt")
     print()
     print(eval_sh)
+    eval_pp_dp = self.eval_model_baseline(baseline = "pp", mode = "demographic_parity")
     print()
     print(eval_pp_dp)
+    eval_pp_eqodds = self.eval_model_baseline(baseline = "pp", mode = "equalized_odds")
     print()
     print(eval_pp_eqodds)
+    eval_fairll_dp = self.eval_model_baseline(baseline = "fair_logloss", mode = "demographic_parity")
     print()
     print(eval_fairll_dp)
-    print()
-    print(eval_fairll_eqopp)
+    eval_fairll_eqodds = self.eval_model_baseline(baseline = "fair_logloss", mode = "equalized_odds")
     print()
     print(eval_fairll_eqodds)
+    eval_fairll_eqopp = self.eval_model_baseline(baseline = "fair_logloss", mode = "equalized_opportunity")
     print()
-    print(eval_MFOpt)
+    print(eval_fairll_eqopp)
+    
+    #eval_MFOpt = self.eval_model_baseline(baseline = "MFOpt")
+    
+    
+    #print()
+    #print(eval_MFOpt)
     self.model_params["eval_sh"]= eval_sh
     self.model_params["eval_pp_dp"]= eval_pp_dp
     self.model_params["eval_pp_eq_odds"] = eval_pp_eqodds
     self.model_params["eval_fairll_dp"] = eval_fairll_dp
     self.model_params["eval_fairll_eqodds"] = eval_fairll_eqodds
     self.model_params["eval_fairll_eqopp"] = eval_fairll_eqopp
-    self.model_params["eval_MFOpt"]= eval_MFOpt
+    #self.model_params["eval_MFOpt"]= eval_MFOpt
     experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     file_dir = os.path.join(self.test_data_path)
-    store_object(self.model_params, file_dir, experiment_filename)
+    store_object(self.model_params, file_dir, experiment_filename, exp_idx)
 
 
 if __name__ == "__main__":
@@ -1041,7 +1044,7 @@ if __name__ == "__main__":
     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
     #sh_obj.base_model()
     sh_obj.read_model_from_file()
-    sh_obj.test_model()
+    sh_obj.test_model(-1)
   
   elif args['task'] == 'noise-test':
     noise = True
@@ -1052,4 +1055,15 @@ if __name__ == "__main__":
       sh_obj.read_demo_list()
       sh_obj.update_model(lr_theta, iters)
       sh_obj.read_model_from_file()
-      sh_obj.test_model()
+      sh_obj.test_model(-1)
+  
+  elif args['task'] == 'test-errorbars':
+    for exp_idx in range(default_args['num_experiment']):
+      print("exp_idx: ", exp_idx)
+      sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
+      sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta)
+      sh_obj.base_model()
+      sh_obj.read_demo_list()
+      sh_obj.update_model(lr_theta, iters)
+      sh_obj.read_model_from_file()
+      sh_obj.test_model(exp_idx)
