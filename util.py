@@ -36,6 +36,8 @@ def make_demo_list_filename(**kwargs):
 
 
 def store_object(obj, path, name, exp_idx):
+    if not os.path.exists(path):
+        os.makedirs(path)
     filepath = os.path.join(path,name)
     from main import default_args
     if exp_idx == -1 or exp_idx == 0:
