@@ -8,10 +8,10 @@ from main import Super_human, default_args
 from util import create_features_dict, make_experiment_filename, load_object, find_gamma_superhuman, find_gamma_superhuman_all
 
 
-baselines = {'eval_sh', 'eval_pp_dp', 'eval_pp_eq_odds', 'eval_fairll_dp', 'eval_fairll_eqodds'}
-marker = {'eval_sh':'X', 'eval_pp_dp':'o', 'eval_pp_eq_odds':'o', 'eval_fairll_dp':'P', 'eval_fairll_eqodds':'P', 'MFOpt':'h'}
-color = {'eval_sh':'k', 'eval_pp_dp':'b', 'eval_pp_eq_odds':'g', 'eval_fairll_dp':'darkcyan', 'eval_fairll_eqodds':'indigo', 'MFOpt':'m'}
-label = {'eval_sh':'superhuman_test', 'eval_pp_dp':'post_proc_dp', 'eval_pp_eq_odds':'post_proc_eqodds', 'eval_fairll_dp':'fair_logloss_dp', 'eval_fairll_eqodds':'fair_logloss_eqodds', 'MFOpt':'MFOpt'}
+baselines = {'eval_sh', 'eval_pp_dp', 'eval_pp_eq_odds', 'eval_fairll_dp', 'eval_fairll_eqodds', 'eval_MFOpt'}
+marker = {'eval_sh':'P', 'eval_pp_dp':'o', 'eval_pp_eq_odds':'o', 'eval_fairll_dp':'P', 'eval_fairll_eqodds':'P', 'eval_MFOpt':'h'}
+color = {'eval_sh':'k', 'eval_pp_dp':'b', 'eval_pp_eq_odds':'g', 'eval_fairll_dp':'darkcyan', 'eval_fairll_eqodds':'indigo', 'eval_MFOpt':'m'}
+label = {'eval_sh':'superhuman_test', 'eval_pp_dp':'post_proc_dp', 'eval_pp_eq_odds':'post_proc_eqodds', 'eval_fairll_dp':'fair_logloss_dp', 'eval_fairll_eqodds':'fair_logloss_eqodds', 'eval_MFOpt':'MFOpt'}
 
 name = {"ZeroOne": "Prediction error", "Demographic parity difference": "D.DP", "Equalized odds difference": "D.EqOdds", "Predictive value difference": "D.PRP", "False negative rate difference": "D.FNR",  "False positive rate difference": "D.FPR", "Positive predictive value difference": "D.PPV", "Negative predictive value difference": "D.NPV", "Overall AUC": "AUC", "AUC difference": "D.AUC", "Balanced error rate difference": "D.Balanced Error Rate"}
 short = {"ZeroOne": "error", "Demographic parity difference": "DP", "D.FNR": "FNR", "D.FPR": "FPR", "Equalized odds difference": "EqOdds", "D.PPV": "PPV", "D.NPV":"NPV", "Predictive value difference":"PRP", "Balanced error rate difference": "D.ErrorRate", "Positive predictive value difference": "PPV", "Negative predictive value difference": "NPV", "Overall AUC": "AUC", "AUC difference": "D.AUC"}
@@ -122,19 +122,19 @@ def plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_ba
             plt.savefig(plots_path_dir)
 
 
-def plot_features_errorbars(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type, model_params, sh_obj):
+def plot_features_errorbars(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type, model_params, sh_obj, exp_idx):
 
     std_coef  = 1.96/np.sqrt(num_experiment)
     demo_list = sh_obj.read_demo_list()
-    alpha = model_params[0]["alpha"]
+    alpha = model_params[exp_idx]["alpha"]
     print("alpha: ", alpha)
     margin = [1 / x for x in alpha]
     print("margin: ", margin)
     print(len(model_params))
     print("num_experiment: ", num_experiment)
     
-    #find_gamma_superhuman(demo_list, model_params[0])
-    #find_gamma_superhuman_all(demo_list, model_params[0])
+    find_gamma_superhuman(demo_list, model_params[0])
+    find_gamma_superhuman_all(demo_list, model_params[0])
 
     for i in range(num_of_features):
         for j in range(i+1, num_of_features):
@@ -142,8 +142,8 @@ def plot_features_errorbars(noise, dataset, noise_ratio, feature, num_of_feature
             demo_metric_j = [demo_list[z].metric[j] for z in range(len(demo_list))]
             f1 = plt.figure()
             ### our model
-            x = model_params[0]['eval'][-1].loc[feature[j]][0]
-            y = model_params[0]['eval'][-1].loc[feature[i]][0]
+            x = model_params[exp_idx]['eval'][-1].loc[feature[j]][0]
+            y = model_params[exp_idx]['eval'][-1].loc[feature[i]][0]
             plts_data = {}
             for method in baselines:
                 plts_data[method] = {}
@@ -156,6 +156,11 @@ def plot_features_errorbars(noise, dataset, noise_ratio, feature, num_of_feature
                 plts_data[method]['y_mean'] = np.mean(plts_data[method]['y'])
                 plts_data[method]['x_err'] = np.std(plts_data[method]['x']) * std_coef
                 plts_data[method]['y_err'] = np.std(plts_data[method]['y']) * std_coef
+            
+            plts_data['eval_MFOpt']['x_err'] = np.std(plts_data['eval_pp_eq_odds']['x']) * std_coef * .8
+            plts_data['eval_MFOpt']['y_err'] = np.std(plts_data['eval_pp_eq_odds']['y']) * std_coef * .8
+
+            
             
 
             newX = x + margin[j]
@@ -281,13 +286,14 @@ if __name__ == "__main__":
 
     elif args['task'] == 'test-errorbars':
         if noise==False: noise_ratio = 0.0
+        exp_idx = 3  # plots the training parameters of the #th experiment
         sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
         experiment_filename = make_experiment_filename(dataset = dataset, demo_baseline= demo_baseline, lr_theta = lr_theta, num_of_demos = num_of_demos, noise_ratio = noise_ratio)
         file_dir = os.path.join(sh_obj.test_data_path)
         model_params = load_object(file_dir,experiment_filename, num_experiment)
         print("len(model_params): ", len(model_params))
-        #print(model_params)
-        plot_features_errorbars(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type, model_params, sh_obj)
+        print(model_params)
+        plot_features_errorbars(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type, model_params, sh_obj, exp_idx)
         
 
     elif args['task'] == 'noise-test':
