@@ -73,7 +73,7 @@ label: ESR
 unique values: [0 1]
 
 """
-default_args = {'dataset': 'Adult', 'iters': 30, 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.0001, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc, dp, eqodds, prp'], 'base_model_type': 'LR', 'num_experiment': 10}
+default_args = {'dataset': 'Adult', 'iters': 30, 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc, dp, eqodds, prp'], 'base_model_type': 'LR', 'num_experiment': 10}
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label', 'acs_west_poverty': 'POVPIP', 'acs_west_mobility': 'MIG', 'acs_west_income': 'PINCP', 'acs_west_insurance': 'HINS2', 'acs_west_public': 'PUBCOV', 'acs_west_travel': 'JWMNP', 'acs_west_employment': 'ESR'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender', 'acs_west_poverty': 'RAC1P', 'acs_west_mobility': 'RAC1P', 'acs_west_income': 'RAC1P', 'acs_west_insurance': 'RAC1P', 'acs_west_public': 'RAC1P', 'acs_west_travel': 'RAC1P', 'acs_west_employment': 'RAC1P'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, \
@@ -176,13 +176,13 @@ class Super_human:
         random_state=12345,
         stratify=Y
         )
-    ###############################################
-    balanced_idx1 = X_train[Y_train==1].index
-    pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
-    X_train = X_train.loc[pp_train_idx, :]
-    Y_train = Y_train.loc[pp_train_idx]
-    A_train = A_train.loc[pp_train_idx]
-    #################################################
+    # ###############################################
+    # balanced_idx1 = X_train[Y_train==1].index
+    # pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
+    # X_train = X_train.loc[pp_train_idx, :]
+    # Y_train = Y_train.loc[pp_train_idx]
+    # A_train = A_train.loc[pp_train_idx]
+    # #################################################
 
     self.model_obj = LR_base_superhuman_model() #LogisticRegression(**self.logi_params)
     print("self.model_obj.type: ", self.model_obj.type)
@@ -250,31 +250,24 @@ class Super_human:
     #Super_human.model_name = model
 
     if self.demo_baseline == "pp":
-      print("running demo baseline: pp")
       model_logi = LogisticRegression(**self.logi_params)
       model_logi.fit(X_train, Y_train)
-      print("finish logi regression")
       # Post-processing
       self.postprocess_est = ThresholdOptimizer(
           estimator=model_logi,
-          constraints= "demographic_parity", #"equalized_odds", #"true_negative_rate_parity", #, #,
+          constraints="demographic_parity", #"equalized_odds",
           predict_method='auto',
-          objective = 'balanced_accuracy_score',
           prefit=True)
-      print("finish postprocess_est")
       # Balanced data set is obtained by sampling the same number of points from the majority class (Y=0)
       # as there are points in the minority class (Y=1)
-      if self.dataset != 'Diabetes':
-        balanced_idx1 = X_train[Y_train==1].index
-        #print("balanced_idx1: ", balanced_idx1)
-        # exit()
-        pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
-        X_train = X_train.loc[pp_train_idx, :]
-        Y_train = Y_train.loc[pp_train_idx]
-        A_train = A_train.loc[pp_train_idx]
+      balanced_idx1 = X_train[Y_train==1].index
+      pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
+      X_train_balanced = X_train.loc[pp_train_idx, :]
+      Y_train_balanced = Y_train.loc[pp_train_idx]
+      A_train_balanced = A_train.loc[pp_train_idx]
 
       # Post-process fitting
-      self.postprocess_est.fit(X_train, Y_train, sensitive_features=A_train)
+      self.postprocess_est.fit(X_train_balanced, Y_train_balanced, sensitive_features=A_train_balanced)
       # Post-process preds
       baseline_preds = self.postprocess_est.predict(X_test, sensitive_features=A_test)
 
@@ -294,7 +287,6 @@ class Super_human:
       Y_test = Y_test.astype('float64')
       A_train = A_train.astype('float64')
       A_test = A_test.astype('float64')
-      #if self.dataset == 'Adult':
       A_train = A_train - 1
       A_test = A_test - 1
 
@@ -310,10 +302,10 @@ class Super_human:
     
 
     ################################################################
-    # if self.noise == True:
-    #     baseline_preds = self.add_noise(baseline_preds, protected=False) # add noise to the predicted label
-    #     A_test_noisy = self.add_noise(A_test, protected=True)    # add noise to the protected attribute
-    #     #Y_test_noisy = self.add_noise(Y_test, protected=False)
+    if self.noise == True:
+        baseline_preds = self.add_noise(baseline_preds, protected=False) # add noise to the predicted label
+        #A_test_noisy = self.add_noise(A_test, protected=True)    # add noise to the protected attribute
+        #Y_test_noisy = self.add_noise(Y_test, protected=False)
     # Metrics
     models_dict = {
               self.demo_baseline : (baseline_preds, baseline_preds)} 
@@ -324,6 +316,7 @@ class Super_human:
     result = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test, feature = feature, is_demo = True)
 
     return result
+
 
     
   def split_data(self, model, alpha=0.5, dataset=None,  mode="post-processing"):
@@ -647,6 +640,35 @@ class Super_human:
     #np.save('subdom_tensor.npy', self.subdom_tensor)
     return subdom_tensor_sum, grad_theta
 
+  # def compute_alpha(self):
+  #   start_time = time.time()
+  #   alpha = np.ones(self.num_of_features)
+  
+  #   for k in range(self.num_of_features):
+  #     sorted_demos = []
+  #     alpha_candidate = []
+  #     for j in range(self.num_of_demos):
+  #       sample_loss = self.sample_loss[j, k]
+  #       demo_loss = self.demo_list[j].metric[k] 
+  #       sorted_demos.append((demo_loss, sample_loss))
+      
+  #     sorted_demos.sort(key = lambda x: x[0]) #dominated_demos.sort(key = lambda x: x[0], reverse=True)   # sort based on demo loss
+  #     sorted_demos = np.array(sorted_demos)
+  #     alpha[k] = np.mean(self.alpha) #100 #max(self.alpha) #np.mean(self.alpha) # default value in case it didn't change using previous alpha values
+  #     for m, demo in enumerate(sorted_demos):
+  #       avg_sample_loss = np.mean([demo[1] for demo in sorted_demos])
+  #       if (demo[0] > demo[1]):
+  #         alpha[k] = min(100, 1.0/(demo[0] - demo[1]))  ### limit max alpha to 100
+  #       if (avg_sample_loss + self.lamda) <= np.mean([x[0] for x in sorted_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
+  #         break
+
+  #   print("--- %s end of compute_alpha ---" % (time.time() - start_time))
+  #   print("alpha : ")
+  #   print(alpha)
+  #   #model_params = {"eval": self.eval}
+  #   find_gamma_superhuman(self.demo_list, self.model_params)
+  #   return alpha
+
   def compute_alpha(self):
     start_time = time.time()
     alpha = np.ones(self.num_of_features)
@@ -660,13 +682,17 @@ class Super_human:
         sorted_demos.append((demo_loss, sample_loss))
       
       sorted_demos.sort(key = lambda x: x[0]) #dominated_demos.sort(key = lambda x: x[0], reverse=True)   # sort based on demo loss
+      #print(self.feature[k])
+      #print("demo_loss, sample_loss: ")
+      #print(sorted_demos)
       sorted_demos = np.array(sorted_demos)
-      alpha[k] = np.mean(self.alpha) #100 #max(self.alpha) #np.mean(self.alpha) # default value in case it didn't change using previous alpha values
+      alpha[k] = 100 #max(self.alpha) #np.mean(self.alpha) # default value in case it didn't change using previous alpha values
+      # print("alpha {}", k)
+      # print(alpha)
       for m, demo in enumerate(sorted_demos):
-        avg_sample_loss = np.mean([demo[1] for demo in sorted_demos])
         if (demo[0] > demo[1]):
           alpha[k] = min(100, 1.0/(demo[0] - demo[1]))  ### limit max alpha to 100
-        if (avg_sample_loss + self.lamda) <= np.mean([x[0] for x in sorted_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
+        if (demo[1] + self.lamda) <= np.mean([x[0] for x in sorted_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
           break
 
     print("--- %s end of compute_alpha ---" % (time.time() - start_time))
@@ -675,7 +701,6 @@ class Super_human:
     #model_params = {"eval": self.eval}
     find_gamma_superhuman(self.demo_list, self.model_params)
     return alpha
-
 
   def eval_model_baseline(self, baseline="pp", mode="demographic_parity"):
 
@@ -986,19 +1011,17 @@ class Super_human:
     eval_fairll_eqopp = self.eval_model_baseline(baseline = "fair_logloss", mode = "equalized_opportunity")
     print()
     print(eval_fairll_eqopp)
+    eval_MFOpt = self.eval_model_baseline(baseline = "MFOpt")
+    print()
+    print(eval_MFOpt)
     
-    #eval_MFOpt = self.eval_model_baseline(baseline = "MFOpt")
-    
-    
-    #print()
-    #print(eval_MFOpt)
     self.model_params["eval_sh"]= eval_sh
     self.model_params["eval_pp_dp"]= eval_pp_dp
     self.model_params["eval_pp_eq_odds"] = eval_pp_eqodds
     self.model_params["eval_fairll_dp"] = eval_fairll_dp
     self.model_params["eval_fairll_eqodds"] = eval_fairll_eqodds
     self.model_params["eval_fairll_eqopp"] = eval_fairll_eqopp
-    #self.model_params["eval_MFOpt"]= eval_MFOpt
+    self.model_params["eval_MFOpt"]= eval_MFOpt
     experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     file_dir = os.path.join(self.test_data_path)
     store_object(self.model_params, file_dir, experiment_filename, exp_idx)
