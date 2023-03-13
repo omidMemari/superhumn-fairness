@@ -286,7 +286,7 @@ if __name__ == "__main__":
 
     elif args['task'] == 'test-errorbars':
         if noise==False: noise_ratio = 0.0
-        exp_idx = 3  # plots the training parameters of the #th experiment
+        exp_idx = 4   # plots the training parameters of the #th experiment
         sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
         experiment_filename = make_experiment_filename(dataset = dataset, demo_baseline= demo_baseline, lr_theta = lr_theta, num_of_demos = num_of_demos, noise_ratio = noise_ratio)
         file_dir = os.path.join(sh_obj.test_data_path)
