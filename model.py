@@ -88,6 +88,7 @@ class NN_base_superhuman_model(base_superhuman_model):
         for x, y in data_loader:
             self.model.zero_grad()
             #p_y = clf(x)
+            # self.model.cuda()
             loss, pred = self.model(x, self.demo_list, self.num_of_demos, self.num_of_features, self.subdom_constant, self.alpha, self.sample_loss)
             #loss = torch.tensor(loss)
             loss.backward()
@@ -99,19 +100,21 @@ class NN_base_superhuman_model(base_superhuman_model):
         train_data = PandasDataSet(X_train, Y_train)
         n_features = X_train.shape[1]
         train_loader = DataLoader(train_data, batch_size=32, shuffle=False, drop_last=True)
+        # train_data.train_data.to(torch.device('cuda:0'))
         print('# training samples:', len(train_data))
         print('# batches:', len(train_loader))
-        self.model = Classifier(n_features=n_features).to('cuda')
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model = Classifier(n_features=n_features).to(device)
         model_optimizer = optim.Adam(self.model.parameters())
 
 
         N_CLF_EPOCHS = 2
 
         for epoch in range(N_CLF_EPOCHS):
-            self.model = self.pretrain_classifier(train_loader, model_optimizer)
+            self.model = self.pretrain_classifier(train_loader, model_optimizer).to(device)
         
         #Additional Info when using cuda
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        
         if device.type == 'cuda':
             print(torch.cuda.get_device_name(0))
             print('Memory Usage:')
@@ -139,7 +142,7 @@ class NN_base_superhuman_model(base_superhuman_model):
         #print("pred: ",  pred)
         #print("pred.numpy(): ", pred.numpy())
         #print("pred.numpy().ravel(): ", pred.numpy().ravel())
-        return pred.numpy()#.ravel()
+        return pred.cpu().numpy()#.ravel()
 
     def get_model_theta(self):
         return self.theta
@@ -159,7 +162,7 @@ class PandasDataSet(TensorDataset):
     def _df_to_tensor(self, df):
         if isinstance(df, pd.Series):
             df = df.to_frame('dummy')
-        return torch.from_numpy(df.values).float()
+        return torch.from_numpy(df.values).float().to(torch.device('cuda:0'))
 
 
 class Classifier(nn.Module):
@@ -209,7 +212,7 @@ class Classifier(nn.Module):
 def pretrain_classifier(clf, data_loader, optimizer, sh_obj):
     for x, y, _ in data_loader:
         clf.zero_grad()
-
+        
         #p_y = clf(x)
         loss, pred = clf(x, sh_obj.demo_list, sh_obj.num_of_demos, sh_obj.num_of_features, sh_obj.subdom_constant, sh_obj.alpha, sh_obj.sample_loss)
         #loss = torch.tensor(loss)
@@ -226,7 +229,7 @@ def predict_nn(X_train, y_train, Z_train, X_test, y_test, Z_test, sh_obj):
     n_features = X_train.shape[1]
 
     train_loader = DataLoader(train_data, batch_size=32, shuffle=True, drop_last=True)
-
+    print("predict_nn")
     print('# training samples:', len(train_data))
     print('# batches:', len(train_loader))
 
