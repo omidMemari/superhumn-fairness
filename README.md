@@ -58,6 +58,3 @@ To reproduce the plots related to performance of our model with varying degrees 
 $ python plot.py -t noise-test -n True -d [Adult|COMPAS] -f inacc dp eqodds prp
 ```
 
-### References
-
-1. Omid Memarrast, Linh Vu, Brian Ziebart. "Superhuman Fairness" [[pdf]](https://arxiv.org/pdf/2301.13420.pdf)
