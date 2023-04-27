@@ -1,6 +1,6 @@
 # Superhuman Fair Classification
 
-This repository provides Python implementation for our paper [Superhuman Fairness](https://arxiv.org/pdf/2301.13420.pdf).
+This repository provides Python implementation for our paper [Superhuman Fairness](https://arxiv.org/pdf/2301.13420.pdf) to appear in ICML 2023.
 
 ### Abstract
 
