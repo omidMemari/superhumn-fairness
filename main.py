@@ -1,5 +1,6 @@
 import os
 import sys
+import subprocess
 import seaborn as sns
 import numpy as np
 import pandas as pd
@@ -73,7 +74,7 @@ label: ESR
 unique values: [0 1]
 
 """
-default_args = {'dataset': 'Adult', 'iters': 30, 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc, dp, eqodds, prp'], 'base_model_type': 'LR', 'num_experiment': 10}
+default_args = {'dataset': 'Adult', 'iters': 30, 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc, dp, eqodds, prp'], 'base_model_type': 'LR', 'num_experiment': 10, 'opt':'superhumn-fairness/experiments/MFOpt_data/acs_west_income'}
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label', 'acs_west_poverty': 'POVPIP', 'acs_west_mobility': 'MIG', 'acs_west_income': 'PINCP', 'acs_west_insurance': 'HINS2', 'acs_west_public': 'PUBCOV', 'acs_west_travel': 'JWMNP', 'acs_west_employment': 'ESR'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender', 'acs_west_poverty': 'RAC1P', 'acs_west_mobility': 'RAC1P', 'acs_west_income': 'RAC1P', 'acs_west_insurance': 'RAC1P', 'acs_west_public': 'RAC1P', 'acs_west_travel': 'RAC1P', 'acs_west_employment': 'RAC1P'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, \
@@ -96,7 +97,7 @@ noise_list = [0.2]#0.03, 0.04]#[0.06, 0.07, 0.08, 0.09]##[0.16, 0.17, 0.18, 0.19
 
 class Super_human:
 
-  def __init__(self, dataset, num_of_demos, feature, num_of_features, lr_theta, noise, noise_ratio, demo_baseline, base_model_type):
+  def __init__(self, dataset, num_of_demos, feature, num_of_features, lr_theta, noise, noise_ratio, demo_baseline, base_model_type, MFOpt_path):
     self.dataset = dataset
     self.num_of_demos = num_of_demos
     self.num_of_features = num_of_features
@@ -124,6 +125,7 @@ class Super_human:
         'solver': 'newton-cg',
         'max_iter': 1000
     }
+    self.MFOPt_path = MFOpt_path
 
   class data_demo:
     def __init__(self, train_x=None, test_x=None, train_y=None, test_y=None, train_A=None, test_A=None, train_A_str=None, test_A_str=None ,idx_train=None, idx_test=None):
@@ -249,7 +251,7 @@ class Super_human:
     A_test = data_demo.test_A
     #Super_human.model_name = model
 
-    if self.demo_baseline == "pp":
+    if self.demo_baseline == "pp"  or self.demo_baseline == "MFOpt":
       model_logi = LogisticRegression(**self.logi_params)
       model_logi.fit(X_train, Y_train)
       # Post-processing
@@ -386,11 +388,14 @@ class Super_human:
         random_state=12345,
         stratify=Y
         )
+    # after getting A X Y, now we take the module to split the data
+    # TODO: to create with MFOpt
     dataset_pp = dataset_ref.iloc[idx_train].reset_index(drop=True) # use only pp portion of the data and leave SH Test portion
     dataset_sh = dataset_ref.iloc[idx_test].reset_index(drop=True)
 
     
     train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
+    
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
     print("u running 5?")
     print(train_file_path)
@@ -444,7 +449,6 @@ class Super_human:
     X_test.to_csv(os.path.join("dataset", self.dataset, 'X_test.csv'),  sep='\t')
     Y_test.to_csv(os.path.join("dataset", self.dataset, 'Y_test.csv'),  sep='\t')
     
-
   def add_noise(self, data, protected=False):
     if protected:
       name = self.sensitive_feature
@@ -800,12 +804,34 @@ class Super_human:
       return metrics
     
     elif baseline == "MFOpt":
-      test_data_filename = "MFOpt_" + dataset + ".csv"
+      print()
+      print("MFOpt")
+      # TODO: read train and test data from csv files
+      # make syscall to MFOpt
+      # these 2 are inputs for julia
+      program_path = "./Method-Comparison.jl"
+      folder = self.MFOPt_path # folder containing mid points and stuffs
+      task = dataset
+      subprocess.call(["julia", program_path, folder, task])
+      print("process run sucessfully")
+      # return True
+      label_filename = task + "_test_opt_label.csv"
+      metrics_filename = task + "_test_opt.csv"
+      
+      train_data_filename = folder + "/" + task + "_train.csv"
+      test_data_filename = folder + "/" + task + "_test.csv"
+      
       if self.noise == True: 
         test_data_filename = "MFOpt_" + dataset +"_0-2"+ ".csv"
+      
+      
       test_file_path = os.path.join(self.test_data_path, test_data_filename)
-      #self.train_data = pd.read_csv(train_file_path, index_col=0)
+      print()
+      print("test_file_path: ", test_file_path)
+
+      self.train_data = pd.read_csv(train_file_path, index_col=0)
       self.test_data = pd.read_csv(test_file_path, index_col=0)
+      
       #A_train = self.train_data[self.sensitive_feature]
       A_test = self.test_data['g']
       #A_str_train = A_train.map(self.dict_map)
@@ -813,11 +839,16 @@ class Super_human:
       # Extract the target
       #Y_train = self.train_data['bin']
       Y_test = self.test_data['y']
-      baseline_preds = self.test_data['bin'] - 1
+      result_path = "./experiments/MFOpt_results"
+      df = pd.read_csv(result_path + "/" + label_filename)
+      baseline_preds = df['bin'] - 1
       baseline_scores = self.test_data.index
       err, exp_zeroone = compute_error(baseline_preds, baseline_scores, Y_test.values)
       print("expected_error: ")
       print(exp_zeroone)
+      
+      print("MFOpt expected error done")
+      print(baseline_preds, baseline_preds)
       #X_train = self.train_data.drop(columns=[self.label])
       #X_test = self.test_data.drop(columns=[self.label])
        # Metrics
@@ -975,6 +1006,7 @@ class Super_human:
   def read_model_from_file(self):
     experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     file_dir = os.path.join(self.train_data_path)
+    print(file_dir, experiment_filename)
     self.model_params = load_object(file_dir,experiment_filename, -1)
     self.model_obj = self.model_params["model"]
     self.theta = self.model_params["theta"]
@@ -1035,6 +1067,7 @@ if __name__ == "__main__":
   parser.add_argument('-b','--demo_baseline', help='model for creating demos', default = default_args['demo_baseline'])
   parser.add_argument('-f', '--features', help="features list", nargs='+', default = default_args['features'])
   parser.add_argument('-m', '--base_model_type', help="model type", default = default_args['base_model_type'])
+  parser.add_argument('-opt', '--opt', help="Specify the MFPOpt_data folder containing train test and bin midpoint", default = default_args['opt'])
   
   args = vars(parser.parse_args())
 
@@ -1044,6 +1077,7 @@ if __name__ == "__main__":
   feature_list = args['features']
   demo_baseline = args['demo_baseline']
   base_model_type = args['base_model_type']
+  MFOpt_path = args['opt']
   feature, num_of_features = create_features_dict(feature_list)
   print("features: ", feature_list)
   noise = eval(args['noise'])
@@ -1052,19 +1086,19 @@ if __name__ == "__main__":
     noise_ratio = 0.0
   
   if args['task'] == 'prepare-demos':
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type, MFOpt_path=MFOpt_path)
     #sh_obj.base_model()
     sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta) # this alpha is different from self.alpha
 
   elif args['task'] == 'train':
     print("lr_theta: ", lr_theta)
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type, MFOpt_path=MFOpt_path)
     sh_obj.base_model()
     sh_obj.read_demo_list()
     sh_obj.update_model(lr_theta, iters)
 
   elif args['task'] == 'test':
-    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
+    sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type, MFOpt_path=MFOpt_path)
     #sh_obj.base_model()
     sh_obj.read_model_from_file()
     sh_obj.test_model(-1)
@@ -1072,7 +1106,7 @@ if __name__ == "__main__":
   elif args['task'] == 'noise-test':
     noise = True
     for noise_ratio in noise_list:
-      sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
+      sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type, MFOpt_path=MFOpt_path)
       sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta)
       sh_obj.base_model()
       sh_obj.read_demo_list()
@@ -1083,7 +1117,7 @@ if __name__ == "__main__":
   elif args['task'] == 'test-errorbars':
     for exp_idx in range(default_args['num_experiment']):
       print("exp_idx: ", exp_idx)
-      sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
+      sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type, MFOpt_path=MFOpt_path)
       sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta)
       sh_obj.base_model()
       sh_obj.read_demo_list()

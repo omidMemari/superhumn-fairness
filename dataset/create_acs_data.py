@@ -39,7 +39,12 @@ def main():
         groups_to_keep = [1, 2]
         acs_data = acs_data.loc[acs_data[group_var].isin(groups_to_keep)]
         dataX, dataY, dataA = acs_task.df_to_pandas(acs_data)
-        # taking catoegorical features        
+        if not os.path.exists('./dataset/{}'.format(task_name)):
+            os.makedirs('./dataset/{}'.format(task_name))
+        dataX.to_csv('./dataset/{}/m_X_data.csv'.format(task_name), index=False, sep='\t')
+        dataY.to_csv('./dataset/{}/m_Y_data.csv'.format(task_name), index=False, sep='\t')
+        dataA.to_csv('./dataset/{}/m_A_data.csv'.format(task_name), index=False, sep='\t')
+        # taking catoegorical features
         categories = generate_categories(features=acs_task.features, definition_df=definition_df)
         categories_cols = categories.keys()
         # taking non-categorical features
@@ -70,12 +75,16 @@ def main():
         f.write("unique values: ")
         f.write('{}'.format(dataY[dataY.columns[0]].unique()))
         f.write('\n\n')
-            
+        
         df = create_dataset_ref(dataX, dataA, dataY)
-        # # create folder with task_name if not exist
-        if not os.path.exists('{}'.format(task_name)):
-            os.makedirs('{}'.format(task_name))
-        path = '{}/dataset_ref.csv'.format(task_name)
+        
+        if not os.path.exists('./dataset/{}'.format(task_name)):
+            os.makedirs('./dataset/{}'.format(task_name))
+        path = './dataset/{}/dataset_ref.csv'.format(task_name)
+        
+        dataX.to_csv('./dataset/{}/X_data.csv'.format(task_name), index=False, sep='\t')
+        dataA.to_csv('./dataset/{}/A_data.csv'.format(task_name), index=False, sep='\t')
+        dataY.to_csv('./dataset/{}/Y_data.csv'.format(task_name), index=False, sep='\t')
         # df = df.to_numpy()
         # np.savetxt(path, df, delimiter=",")
         df.to_csv(path, index=False)
