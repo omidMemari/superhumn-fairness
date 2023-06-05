@@ -77,8 +77,8 @@ def plot_features(noise, dataset, noise_ratio):
             ylim = max(max(demo_metric_i), y_fairll_eq_odds, y_fairll_dp , y_pp_eq_odds, y_pp_dp, newY)*1.2
             #ymin = 0, ymax = max(xs)
             # xLeft is (xlim - x)*0.8 + x
-            plt.xlabel(name[j], fontsize="medium") #plt.xlabel(feature[j])
-            plt.ylabel(name[i], fontsize="medium") #plt.ylabel(feature[i])
+            plt.xlabel(name[j], fontsize="large") #plt.xlabel(feature[j])
+            plt.ylabel(name[i], fontsize="large") #plt.ylabel(feature[i])
             
             plt.plot(x_test, y_test, 'Xk', label = 'superhuman_test')
             plt.plot(x, y, 'ro', label = 'superhuman_train')
@@ -109,20 +109,20 @@ def plot_features(noise, dataset, noise_ratio):
             plt.plot([newX, newX], [newY, ylim], 'r--')
             plt.plot([newX, xlim], [newY, newY], 'r--')
             plt.annotate('', xy=(newX, yLeft), xytext=(x, yLeft), xycoords='data', textcoords='data',
-                        arrowprops={'arrowstyle': '<->'}, fontsize="medium")
+                        arrowprops={'arrowstyle': '<->'}, fontsize="large")
             # write the text to the top of the arrow above
-            plt.text((newX + x) * 0.5, yLeft, fr"$1/\alpha_{{{short[feature[j]]}}}$", horizontalalignment='center', verticalalignment='bottom', fontsize="medium")
+            plt.text((newX + x) * 0.5, yLeft, fr"$1/\alpha_{{{short[feature[j]]}}}$", horizontalalignment='center', verticalalignment='bottom', fontsize="large")
             plt.annotate('', xy=(xBottom, newY), xytext=(xBottom, y), xycoords='data', textcoords='data',
-                        arrowprops={'arrowstyle': '<->'}, fontsize="medium")
+                        arrowprops={'arrowstyle': '<->'}, fontsize="large")
             # write the text to the right of the arrow above
             plt.text(xBottom, (newY + y) * 0.5,
-                    fr"$1/\alpha_{{{short[feature[i]]}}}$", horizontalalignment='left', verticalalignment='center', fontsize="medium")
+                    fr"$1/\alpha_{{{short[feature[i]]}}}$", horizontalalignment='left', verticalalignment='center', fontsize="large")
             
             handles, labels = plt.gca().get_legend_handles_labels()
             plt.grid(True)
             #plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left", mode="expand", borderaxespad=0, ncol=2)
             #plt.legend(reversed(handles), reversed(labels),loc='best', ncol=1, fontsize="medium")
-            plt.title(dataset, fontsize="medium")
+            plt.title(dataset, fontsize="x-large")
             plot_file_name = short[feature[j]] + "_vs_" + short[feature[i]] + "_{}_{}_{}".format(dataset, model_params['demo_baseline'], noise_ratio).replace('.','-') + ".pdf"
             plots_path_dir = os.path.join(sh_obj.plots_path, plot_file_name) # short[feature[j]] + "_vs_"+ short[feature[i]] + ".png")
             plt.savefig(plots_path_dir)
