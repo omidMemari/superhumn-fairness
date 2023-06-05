@@ -121,11 +121,21 @@ def plot_features(noise, dataset, noise_ratio):
             handles, labels = plt.gca().get_legend_handles_labels()
             plt.grid(True)
             #plt.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left", mode="expand", borderaxespad=0, ncol=2)
-            plt.legend(reversed(handles), reversed(labels),loc='best', ncol=1, fontsize="small")
+            #plt.legend(reversed(handles), reversed(labels),loc='best', ncol=1, fontsize="medium")
             plt.title(dataset)
             plot_file_name = short[feature[j]] + "_vs_" + short[feature[i]] + "_{}_{}_{}".format(dataset, model_params['demo_baseline'], noise_ratio).replace('.','-') + ".pdf"
             plots_path_dir = os.path.join(sh_obj.plots_path, plot_file_name) # short[feature[j]] + "_vs_"+ short[feature[i]] + ".png")
             plt.savefig(plots_path_dir)
+
+            # get handles and labels for reuse
+            #label_params = ax.get_legend_handles_labels() 
+
+            figl, axl = plt.subplots(figsize=(16,1))
+            axl.axis(False)
+            axl.legend(reversed(handles), reversed(labels), loc="center", ncols=8, prop={"size":11}, fontsize="large")
+            plot_file_name1 = "legend.pdf" #short[feature[j]] + "_vs_" + short[feature[i]] + "_{}_{}_{}".format(dataset, model_params['demo_baseline'], noise_ratio).replace('.','-') + ".png"
+            plots_path_dir1 = os.path.join(sh_obj.plots_path, plot_file_name1) # short[feature[j]] + "_vs_"+ short[feature[i]] + ".png")
+            figl.savefig(plots_path_dir1)
 
 
 
