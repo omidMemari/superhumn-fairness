@@ -130,9 +130,9 @@ def plot_features(noise, dataset, noise_ratio):
             # get handles and labels for reuse
             #label_params = ax.get_legend_handles_labels() 
 
-            figl, axl = plt.subplots(figsize=(16,1))
+            figl, axl = plt.subplots(figsize=(12,0.8))
             axl.axis(False)
-            axl.legend(reversed(handles), reversed(labels), loc="center", ncols=8, prop={"size":11}, fontsize="large")
+            axl.legend(reversed(handles), reversed(labels), loc="center", ncols=4, prop={"size":14}, fontsize="x-large")
             plot_file_name1 = "legend.pdf" #short[feature[j]] + "_vs_" + short[feature[i]] + "_{}_{}_{}".format(dataset, model_params['demo_baseline'], noise_ratio).replace('.','-') + ".png"
             plots_path_dir1 = os.path.join(sh_obj.plots_path, plot_file_name1) # short[feature[j]] + "_vs_"+ short[feature[i]] + ".png")
             figl.savefig(plots_path_dir1)
