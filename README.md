@@ -1,6 +1,6 @@
 # Superhuman Fair Classification
 
-This repository provides Python implementation for our paper [Superhuman Fairness](https://proceedings.mlr.press/v202/memarrast23a/memarrast23a.pdf) to appear in ICML 2023.
+This repository provides Python implementation for our paper [Superhuman Fairness](https://proceedings.mlr.press/v202/memarrast23a/memarrast23a.pdf) published at ICML 2023.
 
 ### Abstract
 
