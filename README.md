@@ -1,6 +1,6 @@
 # Superhuman Fair Classification
 
-This repository provides Python implementation for our paper [Superhuman Fairness](https://arxiv.org/pdf/2301.13420.pdf) to appear in ICML 2023.
+This repository provides Python implementation for our paper [Superhuman Fairness](https://proceedings.mlr.press/v202/memarrast23a/memarrast23a.pdf) to appear in ICML 2023.
 
 ### Abstract
 
@@ -47,12 +47,12 @@ To test our model and compare it with other baselines, we run:
 $ python main.py -t test -n [True|False] -d [Adult|COMPAS] -f inacc dp eqodds prp
 ```
 
-To plot the results created by test command, we use `plot.py` file:
+To plot the results created by the test command, we use `plot.py` file:
 
 ```console
 $ python plot.py -t test -n [True|False] -d [Adult|COMPAS] -f inacc dp eqodds prp
 ```
-To reproduce the plots related to performance of our model with varying degrees of noise:
+To reproduce the plots related to the performance of our model with varying degrees of noise:
 
 ```console
 $ python plot.py -t noise-test -n True -d [Adult|COMPAS] -f inacc dp eqodds prp
