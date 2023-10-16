@@ -73,7 +73,7 @@ label: ESR
 unique values: [0 1]
 
 """
-default_args = {'dataset': 'Adult', 'iters': 30, 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc, dp, eqodds, prp'], 'base_model_type': 'LR', 'num_experiment': 10}
+default_args = {'dataset': 'Adult', 'iters': 30, 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc', 'dp', 'eqodds', 'prp'], 'base_model_type': 'LR', 'num_experiment': 10}
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label', 'acs_west_poverty': 'POVPIP', 'acs_west_mobility': 'MIG', 'acs_west_income': 'PINCP', 'acs_west_insurance': 'HINS2', 'acs_west_public': 'PUBCOV', 'acs_west_travel': 'JWMNP', 'acs_west_employment': 'ESR'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender', 'acs_west_poverty': 'RAC1P', 'acs_west_mobility': 'RAC1P', 'acs_west_income': 'RAC1P', 'acs_west_insurance': 'RAC1P', 'acs_west_public': 'RAC1P', 'acs_west_travel': 'RAC1P', 'acs_west_employment': 'RAC1P'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, \
