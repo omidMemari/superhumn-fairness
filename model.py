@@ -85,6 +85,8 @@ class NN_base_superhuman_model(base_superhuman_model):
 
 
     def pretrain_classifier(self, data_loader, optimizer):
+        running_loss = 0
+        last_loss = 0
         for x, y in data_loader:
             self.model.zero_grad()
             #p_y = clf(x)
@@ -97,39 +99,49 @@ class NN_base_superhuman_model(base_superhuman_model):
 
     def fit(self, X_train, Y_train):
         
-        train_data = PandasDataSet(X_train, Y_train)
+        train_data = X_train, Y_train#PandasDataSet(X_train, Y_train)
         n_features = X_train.shape[1]
         train_loader = DataLoader(train_data, batch_size=32, shuffle=False, drop_last=True)
         # train_data.train_data.to(torch.device('cuda:0'))
         print('# training samples:', len(train_data))
         print('# batches:', len(train_loader))
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.model = Classifier(n_features=n_features).to(device)
+        # device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print("running here")
+        self.model = Classifier(n_features=n_features)
         model_optimizer = optim.Adam(self.model.parameters())
 
 
-        N_CLF_EPOCHS = 2
-
+        N_CLF_EPOCHS = 30
         for epoch in range(N_CLF_EPOCHS):
-            self.model = self.pretrain_classifier(train_loader, model_optimizer).to(device)
+            print(epoch)
+            self.model = self.pretrain_classifier(train_loader, model_optimizer)
         
         #Additional Info when using cuda
         
-        if device.type == 'cuda':
-            print(torch.cuda.get_device_name(0))
-            print('Memory Usage:')
-            print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
-            print('Cached:   ', round(torch.cuda.memory_reserved(0)/1024**3,1), 'GB')
-
+        # if device.type == 'cuda':
+        #     print(torch.cuda.get_device_name(0))
+        #     print('Memory Usage:')
+        #     print('Allocated:', round(torch.cuda.memory_allocated(0)/1024**3,1), 'GB')
+        #     print('Cached:   ', round(torch.cuda.memory_reserved(0)/1024**3,1), 'GB')
+        print("it returned")
         return self.model
 
     def predict_proba(self, X):
         if type(X) is list: # used when X is only an item
-            data = torch.Tensor(X)
+            X = np.asarray(X, dtype=np.float32)
+            # data = torch.Tensor(X)
+            data = torch.from_numpy(X)
         else:               # when X is a dataframe of items
-            X = pd.DataFrame(X)
-            test_data = PandasDataSet(X)
-            data = test_data.tensors[0].to('cuda')
+            if isinstance(X, np.ndarray):
+                data = torch.from_numpy(X)
+            elif isinstance(X, pd.DataFrame):
+                data = X.to_numpy()
+                data = torch.from_numpy(data)
+            else:
+                data = X
+            #X = pd.DataFrame(X)
+            # data = torch.tensor(test_data.values.astype(np.float32))
+                
             #print("test_data: ", test_data)
             #print("test_data.tensors[0]: ", test_data.tensors[0])
 
@@ -181,9 +193,9 @@ class Classifier(nn.Module):
             nn.Dropout(p_dropout),
             nn.Linear(n_hidden, 2),
         )
-        torch.set_default_tensor_type(torch.cuda.FloatTensor)
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        print('Using device:', self.device)
+        torch.set_default_tensor_type(torch.FloatTensor)
+        # self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        # print('Using device:', self.device)
 
     def forward(self, x, demo_list, num_of_demos, num_of_features, subdom_constant, alpha, sample_loss):
         loss = self.subdom_loss(demo_list, num_of_demos, num_of_features, subdom_constant, alpha, sample_loss) 
@@ -191,13 +203,13 @@ class Classifier(nn.Module):
     
     def subdom_loss(self, demo_list, num_of_demos, num_of_features, subdom_constant, alpha, sample_loss):
         start_time = time.time()
-        subdom_tensor = torch.empty([num_of_demos, num_of_features], device=self.device)
-        sample_loss_arr = torch.tensor(sample_loss, requires_grad=True, device=self.device)
+        subdom_tensor = torch.empty([num_of_demos, num_of_features])
+        sample_loss_arr = torch.tensor(sample_loss, requires_grad=True)
         for j, x in enumerate(demo_list):
             for k in range(num_of_features):
                 sample_loss = sample_loss_arr[j, k]
-                demo_loss = torch.tensor(demo_list[j].metric[k], requires_grad=True, device=self.device)
-                subdom_val = max(torch.tensor(alpha[k], requires_grad=True, device=self.device)*(sample_loss - demo_loss) + 1, 0)    
+                demo_loss = torch.tensor(demo_list[j].metric[k], requires_grad=True)
+                subdom_val = max(torch.tensor(alpha[k], requires_grad=True)*(sample_loss - demo_loss) + 1, 0)    
                 subdom_tensor[j, k] =  subdom_val - subdom_constant       # subtract constant c to optimize for useful demonstation instead of avoiding from noisy ones
                 #grad_theta += self.subdom_tensor[j, k] * self.feature_matching(j)
             
@@ -210,9 +222,10 @@ class Classifier(nn.Module):
 
 
 def pretrain_classifier(clf, data_loader, optimizer, sh_obj):
+    print("this is running")
     for x, y, _ in data_loader:
+        print("running")
         clf.zero_grad()
-        
         #p_y = clf(x)
         loss, pred = clf(x, sh_obj.demo_list, sh_obj.num_of_demos, sh_obj.num_of_features, sh_obj.subdom_constant, sh_obj.alpha, sh_obj.sample_loss)
         #loss = torch.tensor(loss)
@@ -224,8 +237,8 @@ def pretrain_classifier(clf, data_loader, optimizer, sh_obj):
 
 def predict_nn(X_train, y_train, Z_train, X_test, y_test, Z_test, sh_obj):
     
-    train_data = PandasDataSet(X_train, y_train, Z_train)
-    test_data = PandasDataSet(X_test, y_test, Z_test)
+    train_data = X_train, y_train, Z_train #PandasDataSet(X_train, y_train, Z_train)
+    test_data = X_test, y_test, Z_test #PandasDataSet(X_test, y_test, Z_test)
     n_features = X_train.shape[1]
 
     train_loader = DataLoader(train_data, batch_size=32, shuffle=True, drop_last=True)
@@ -250,4 +263,3 @@ def predict_nn(X_train, y_train, Z_train, X_test, y_test, Z_test, sh_obj):
     acc = accuracy_score(y_test, pre_clf_test.numpy().ravel().round())
     print(acc)
     return pre_clf_test.numpy().ravel().round()
-

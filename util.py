@@ -25,7 +25,8 @@ def create_features_dict(feature_list):
   num_of_features = len(feature_list)
   feature = {}
   for i, f in enumerate(feature_list):
-    feature[i] = feature_expand_dict[f]
+        print(i, f)
+        feature[i] = feature_expand_dict[f]
   return feature, num_of_features
 
 def make_experiment_filename(**kwargs):

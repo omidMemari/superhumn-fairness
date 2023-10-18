@@ -11,6 +11,7 @@ from sklearn.utils import shuffle
 import warnings
 import copy
 import math
+import torch
 import argparse
 from tqdm import tqdm
 from test_nn import predict_nn
@@ -73,7 +74,7 @@ label: ESR
 unique values: [0 1]
 
 """
-default_args = {'dataset': 'Adult', 'iters': 30, 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc, dp, eqodds, prp'], 'base_model_type': 'LR', 'num_experiment': 10}
+default_args = {'dataset': 'Adult', 'iters': 30, 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc', 'dp', 'eqodds', 'prp'], 'base_model_type': 'LR', 'num_experiment': 10}
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label', 'acs_west_poverty': 'POVPIP', 'acs_west_mobility': 'MIG', 'acs_west_income': 'PINCP', 'acs_west_insurance': 'HINS2', 'acs_west_public': 'PUBCOV', 'acs_west_travel': 'JWMNP', 'acs_west_employment': 'ESR'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender', 'acs_west_poverty': 'RAC1P', 'acs_west_mobility': 'RAC1P', 'acs_west_income': 'RAC1P', 'acs_west_insurance': 'RAC1P', 'acs_west_public': 'RAC1P', 'acs_west_travel': 'RAC1P', 'acs_west_employment': 'RAC1P'}
 protected_map = {'Adult': {2:"Female", 1:"Male"}, 'COMPAS': {1:'Caucasian', 0:'African-American'}, \
@@ -153,7 +154,6 @@ class Super_human:
     self.dataset_path = os.path.join("dataset", self.dataset, "dataset_ref.csv")
 
   def base_model(self):
-    
     self.model_name = "logistic-regression"
     train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
@@ -186,6 +186,7 @@ class Super_human:
 
     self.model_obj = LR_base_superhuman_model() #LogisticRegression(**self.logi_params)
     print("self.model_obj.type: ", self.model_obj.type)
+    print(Y_train)
     self.model_obj.fit(X_train, Y_train)
     self.pred_scores = self.model_obj.predict_proba(X_test)
 
@@ -522,6 +523,8 @@ class Super_human:
     return self.demo_list
 
   def get_model_pred(self, item): # an item is one row of the dataset
+    # print(type(item))
+    item = np.asarray(item, dtype=np.float32)
     score = self.model_obj.predict_proba(item).squeeze() # [p(y = 0), p(y = 1)]
     return score
 
@@ -536,16 +539,17 @@ class Super_human:
 
   def sample_superhuman(self):
     start_time = time.time()
-
+    print("")
     train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
 
     self.train_data = pd.read_csv(train_file_path, index_col=0)
-    X = self.train_data.drop(columns=[self.label]).to_numpy()
+    X = self.train_data.drop(columns=[self.label]).to_numpy(dtype=np.float32)
     data_size, feature_size = self.train_data.shape
     self.sample_matrix = np.zeros((self.num_of_demos, data_size)) #np.array([[-1 for _ in range(data_size)] for _ in range(num_of_samples)]) # create a matrix of size [num_of_samples * data_set_size]. Each row is a sample from our model that predicts the self.label of dataset.
     for j in range(data_size):
-      probs = self.get_model_pred(item = [X[j]])
+      # print("check X[j] here", type(X[j]))
+      probs = self.get_model_pred(item = [X[j]] )
       self.sample_matrix[:,j] = self.sample_from_prob(dist = probs, size = self.num_of_demos) # return a vector of size num_of_samples (50) with self.label prediction samples for j_th item of the dataset
           
     print("--- %s end of sample_superhuman ---" % (time.time() - start_time))
@@ -860,7 +864,15 @@ class Super_human:
     #print("len(X): ", X.shape)
     #print("len(Y): ", Y_test.shape)
     #print("self.model_obj.predict_proba(X):", self.model_obj.predict_proba(X))
+    print("THIS IS XXXXXXX")
+    print("THIS IS PREDICT PROBAB XXXXXXX")
+    # test = self.model_obj.predict_proba(X)
+
+    if isinstance(X, pd.DataFrame):
+      X = X.to_numpy(dtype=np.float32)
+      X = torch.from_numpy(X)
     scores = self.model_obj.predict_proba(X)[:, 1]
+
     # Predictions (0 or 1) on test set
     preds = (scores >= np.mean(Y_train)) * 1
     #preds = predict_nn(X, Y_train, A, X, Y_test, A, self)
@@ -871,20 +883,12 @@ class Super_human:
     eval = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str, feature = feature, is_demo = False)
     return eval
 
-  # def get_model_theta(self):
-  #   return self.model_obj.get_model_theta()  #self.model_obj.coef_[0]
-
-  # def update_model_theta(self, new_theta):
-  #   self.model_obj.update_model_theta(new_theta)
-  #   #self.model_obj.coef_ = np.asarray([new_theta]) # update the coefficient of our logistic regression model with the new theta
-  
   def get_model_alpha(self):
     return self.alpha
 
   def update_model_alpha(self, new_alpha):
     self.alpha = new_alpha
   
-
   def update_model(self, lr_theta, iters):
     self.lr_theta = lr_theta
     self.grad_theta, subdom_tensor_sum_arr, self.eval, self.gamma_superhuman_arr = [], [], [], []
@@ -899,13 +903,17 @@ class Super_human:
       self.model_obj = NN_base_superhuman_model(self.demo_list, self.num_of_demos, self.num_of_features, self.subdom_constant, self.alpha, self.sample_loss)
       self.model_obj.fit(X, Y)
     gamma_degrade = 0
+    print("after it returned")
     for i in tqdm(range(iters)):
       # find sample loss and store it, we will use it for computing grad_theta and grad_alpha
+      print("sample superhuman")
       self.sample_superhuman() # update self.sample_matrix with new samples from new theta
+      print("get_samples_demo_indexed")
       self.get_samples_demo_indexed()
+      print("get sample")
       self.get_sample_loss()
       alpha = self.get_model_alpha()
-
+      print("we running here in tqdm?")
       if isinstance(self.model_obj, LR_base_superhuman_model):
         print("model is LR_base_superhuman_model")
         # get the current theta and alpha
@@ -923,6 +931,7 @@ class Super_human:
         self.model_obj.update_model_theta(new_theta)
         self.grad_theta.append(grad_theta)
         #update alpha
+        
         
       elif isinstance(self.model_obj, NN_base_superhuman_model):
         print("model is NN_base_superhuman_model")
