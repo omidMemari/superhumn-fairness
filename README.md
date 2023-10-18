@@ -58,3 +58,5 @@ To reproduce the plots related to the performance of our model with varying degr
 $ python plot.py -t noise-test -n True -d [Adult|COMPAS] -f inacc dp eqodds prp
 ```
 
+python main.py -t train -n False -m "NN" -d Adult -f inacc dp eqodds prp
+python main.py -t train -n False -d Adult -f inacc dp eqodds prp

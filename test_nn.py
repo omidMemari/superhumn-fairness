@@ -61,10 +61,10 @@ class Classifier(nn.Module):
             nn.Linear(n_features, n_hidden),
             nn.ReLU(),
             nn.Dropout(p_dropout),
-            nn.Linear(n_hidden, n_hidden),
+            nn.Linear(n_hidden/2, n_hidden/2),
             nn.ReLU(),
             nn.Dropout(p_dropout),
-            nn.Linear(n_hidden, n_hidden),
+            nn.Linear(n_hidden/4, n_hidden/4),
             nn.ReLU(),
             nn.Dropout(p_dropout),
             nn.Linear(n_hidden, 1),
@@ -72,7 +72,7 @@ class Classifier(nn.Module):
         self.sh_obj = sh_obj
 
     def forward(self, x, demo_list, num_of_demos, num_of_features, subdom_constant, alpha, sample_loss):
-        loss = subdom_loss(demo_list, num_of_demos, num_of_features, subdom_constant, alpha, sample_loss) 
+        loss = subdom_loss(demo_list, num_of_demos, num_of_features, subdom_constant, alpha, sample_loss)
         return loss, torch.sigmoid(self.network(x))
 
 
@@ -80,7 +80,6 @@ class Classifier(nn.Module):
 def pretrain_classifier(clf, data_loader, optimizer, criterion, sh_obj):
     for x, y, _ in data_loader:
         clf.zero_grad()
-
         #p_y = clf(x)
         loss, pred = clf(x, sh_obj.demo_list, sh_obj.num_of_demos, sh_obj.num_of_features, sh_obj.subdom_constant, sh_obj.alpha, sh_obj.sample_loss)
         #loss = torch.tensor(loss)
@@ -103,7 +102,6 @@ def predict_nn(X_train, y_train, Z_train, X_test, y_test, Z_test, sh_obj):
 
 
     clf = Classifier(n_features=n_features, sh_obj = sh_obj)
-    #clf_criterion = criterion()
     clf_criterion = nn.BCELoss()
     clf_optimizer = optim.Adam(clf.parameters())
 
@@ -121,4 +119,7 @@ def predict_nn(X_train, y_train, Z_train, X_test, y_test, Z_test, sh_obj):
     acc = accuracy_score(y_test, pre_clf_test.numpy().ravel().round())
     print(acc)
     return pre_clf_test.numpy().ravel().round()
+
+
+
 
