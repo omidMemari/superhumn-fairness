@@ -1,3 +1,0 @@
-for file in Adult_* ; do
-    mv ./"$file" "${file:0:6}pp_${file:6}"
-done
