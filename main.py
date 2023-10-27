@@ -17,10 +17,8 @@ import torch
 import argparse
 import matplotlib.pyplot as plt
 from tqdm import tqdm
-from test_nn import predict_nn
 warnings.filterwarnings('ignore')
 from sklearn.model_selection import train_test_split
-import lightgbm as lgb
 from sklearn.linear_model import LogisticRegression
 # Fairlearn algorithms and utils
 from fairlearn.postprocessing import ThresholdOptimizer
@@ -58,6 +56,7 @@ class Super_human:
     self.feature = feature
     # self.alpha is torch.nn.Parameter and it is a list of [1.0 for _ in range(self.num_of_features)]
     self.alpha = torch.nn.parameter.Parameter(torch.ones(num_of_features).cuda(), requires_grad=True)
+    # self.alpha = np.ones(num_of_features)
     self.gamma_superhuman = [0.0 for _ in range(self.num_of_features)]
     self.label = label_dict[dataset] ##
     print("self.label: ", self.label)
@@ -161,34 +160,26 @@ class Super_human:
         stratify=Y
         )
     losses = []
-    self.model_obj = Net(X_train.shape[1]).cuda()
-    optim1 = optim.Adam(list(self.model_obj.parameters()), lr=0.1)
-    optim2 = optim.Adam([self.alpha], lr=0.1)
-    for i in range(200):
-      print("epoch:", i)
-      self.sample_superhuman()
-      self.get_samples_demo_indexed()
-      self.get_sample_loss()
-      loss = self.subdom_loss_t()
-      optim2.zero_grad()
-      optim1.zero_grad()
-      (loss).backward()
-      optim1.step()
-      optim2.step()
-      losses.append(loss.item())
-      print("loss: ", loss.item())
-      # new_alpha = self.compute_alpha()
-      # self.update_model_alpha(new_alpha)
-    # write losses to file
-    with open("losses.txt", "w") as f:
-      for loss in losses:
-        f.write(str(loss) + "\n")
-    torch.save(self.model_obj.state_dict(), 'model.pth')
-    
-    
     X_test = X_test.to_numpy(dtype=np.float32)
-    # X_test to torch
     X_test = torch.from_numpy(X_test).cuda()
+    X_train = X_train.to_numpy(dtype=np.float32)
+    X_train = torch.from_numpy(X_train).cuda()
+    Y_train = Y_train.to_numpy(dtype=np.float32)
+    Y_train = torch.from_numpy(Y_train).cuda()
+    crtiteron = torch.nn.CrossEntropyLoss()
+    
+    self.model_obj = Net(X_train.shape[1]).cuda()
+    self.model_obj.optimizer = optim.Adam(self.model_obj.parameters(), lr=self.lr_theta)
+    for i in range(200):
+      self.model_obj.train()
+      self.model_obj.zero_grad()
+      pred = self.model_obj(X_train)
+      loss = crtiteron(pred, Y_train.type(torch.LongTensor).cuda())
+      loss.backward()
+      losses.append(loss.item())
+      self.model_obj.optimizer.step()
+      if i % 10 == 0:
+        print("loss: ", loss.item())
     self.pred_scores = self.model_obj(X_test)
     print(self.pred_scores)
     if self.dataset == 'COMPAS':
@@ -876,14 +867,24 @@ class Super_human:
     Y = self.train_data[self.label]
     X = self.train_data.drop(columns=[self.label])
     if self.base_model_type == 'NN':
-      self.subdom_constant = 0
-      # must be in training loop
-      self.sample_superhuman()
-      self.get_samples_demo_indexed()
-      self.get_sample_loss()
-      self.model_obj = Net()
-      # training loop 
-      self.model_obj.fit()
+      optim1 = optim.Adam(list(self.model_obj.parameters()), lr=0.1)
+      optim2 = optim.Adam([self.alpha], lr=0.1)
+      for i in range(10):
+        print("epoch:", i)
+        self.sample_superhuman()
+        self.get_samples_demo_indexed()
+        self.get_sample_loss()
+        loss = self.subdom_loss_t()
+        optim2.zero_grad()
+        optim1.zero_grad()
+        (loss).backward()
+        optim1.step()
+        optim2.step()
+        print(self.alpha)
+        print("loss: ", loss.item())
+        print(self.eval_model(mode = "train"))
+      # save model  
+      torch.save(self.model_obj.state_dict(), 'model.pth')
     return
       # self.model_obj.fit(X, Y)
     gamma_degrade = 0
@@ -982,6 +983,13 @@ class Super_human:
         self.logi_params = self.base_dict["logi_params"]
     except Exception:
       self.base_model()
+  def read_nn_model(self):
+    experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
+    file_dir = os.path.join(self.train_data_path)
+    self.model_obj = Net(109).cuda()
+    self.model_obj.load_state_dict(torch.load('model.pth'))
+    self.model_obj.eval()
+    
 
 
   def test_model(self, exp_idx):
@@ -1052,16 +1060,17 @@ if __name__ == "__main__":
     print("lr_theta: ", lr_theta)
     # {'dataset': 'Adult', 'iters': 30, 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc', 'dp', 'eqodds', 'prp'], 'base_model_type': 'LR', 'num_experiment': 10}
     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
-    sh_obj.read_demo_list()
+    
     sh_obj.base_model()
-    # sh_obj.read_demo_list()
-    # sh_obj.update_model(lr_theta, iters)
+    sh_obj.read_demo_list()
+    sh_obj.update_model(lr_theta, iters)
     sh_obj.test_model(-1)
 
   elif args['task'] == 'test':
     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
     #sh_obj.base_model()
-    sh_obj.read_model_from_file()
+    # sh_obj.read_model_from_file()
+    sh_obj.read_nn_model()
     sh_obj.test_model(-1)
   
   elif args['task'] == 'noise-test':
