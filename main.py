@@ -1,4 +1,6 @@
 import os
+import torch
+import torch.optim as optim 
 import sys
 import seaborn as sns
 import numpy as np
@@ -13,6 +15,7 @@ import copy
 import math
 import torch
 import argparse
+import matplotlib.pyplot as plt
 from tqdm import tqdm
 from test_nn import predict_nn
 warnings.filterwarnings('ignore')
@@ -23,57 +26,8 @@ from sklearn.linear_model import LogisticRegression
 from fairlearn.postprocessing import ThresholdOptimizer
 from util import compute_error, get_metrics_df, create_features_dict, find_gamma_superhuman, find_gamma_superhuman_all, load_object, store_object, make_demo_list_filename, make_experiment_filename
 from fair_logloss.fair_logloss import DP_fair_logloss_classifier, EOPP_fair_logloss_classifier, EODD_fair_logloss_classifier
-from model import LR_base_superhuman_model, NN_base_superhuman_model
-"""
-task_name: acs_west_poverty
-protected attribute: RAC1P
-unique values: [0 1] // 0 us White, 1 is Black
-label: POVPIP
-unique values: [1 0]
+from model import LR_base_superhuman_model, Net
 
-task_name: acs_west_mobility
-protected attribute: RAC1P
-unique values: [0 1]
-label: MIG
-unique values: [1 0]
-
-task_name: acs_west_income
-protected attribute: RAC1P
-unique values: [0 1]
-label: PINCP
-unique values: [0 1]
-
-task_name: acs_west_insurance
-protected attribute: RAC1P
-unique values: [0 1]
-label: HINS2
-unique values: [0 1]
-
-task_name: acs_west_public
-protected attribute: RAC1P
-unique values: [0 1]
-label: PUBCOV
-unique values: [0 1]
-
-task_name: acs_west_travel
-protected attribute: RAC1P
-unique values: [0 1]
-label: JWMNP
-unique values: [0 1]
-
-task_name: acs_west_poverty
-protected attribute: RAC1P
-unique values: [0 1]
-label: POVPIP
-unique values: [1 0]
-
-task_name: acs_west_employment
-protected attribute: RAC1P
-unique values: [0 1]
-label: ESR
-unique values: [0 1]
-
-"""
 default_args = {'dataset': 'Adult', 'iters': 30, 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc', 'dp', 'eqodds', 'prp'], 'base_model_type': 'LR', 'num_experiment': 10}
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label', 'acs_west_poverty': 'POVPIP', 'acs_west_mobility': 'MIG', 'acs_west_income': 'PINCP', 'acs_west_insurance': 'HINS2', 'acs_west_public': 'PUBCOV', 'acs_west_travel': 'JWMNP', 'acs_west_employment': 'ESR'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender', 'acs_west_poverty': 'RAC1P', 'acs_west_mobility': 'RAC1P', 'acs_west_income': 'RAC1P', 'acs_west_insurance': 'RAC1P', 'acs_west_public': 'RAC1P', 'acs_west_travel': 'RAC1P', 'acs_west_employment': 'RAC1P'}
@@ -102,7 +56,8 @@ class Super_human:
     self.num_of_demos = num_of_demos
     self.num_of_features = num_of_features
     self.feature = feature
-    self.alpha = [1.0 for _ in range(self.num_of_features)]
+    # self.alpha is torch.nn.Parameter and it is a list of [1.0 for _ in range(self.num_of_features)]
+    self.alpha = torch.nn.parameter.Parameter(torch.ones(num_of_features).cuda(), requires_grad=True)
     self.gamma_superhuman = [0.0 for _ in range(self.num_of_features)]
     self.label = label_dict[dataset] ##
     print("self.label: ", self.label)
@@ -152,20 +107,49 @@ class Super_human:
     self.test_data_path = os.path.join(root, "test")
     self.plots_path = os.path.join(root,"plots")
     self.dataset_path = os.path.join("dataset", self.dataset, "dataset_ref.csv")
-
+  
+  def subdom_loss(self, demo_list, num_of_demos, num_of_features, subdom_constant, alpha, sample_loss):
+      subdom_tensor = torch.empty([num_of_demos, num_of_features]).cuda()
+      sample_loss_arr = torch.tensor(sample_loss, requires_grad=True).cuda()
+      for j, x in enumerate(demo_list):
+          for k in range(num_of_features):
+              sample_loss = sample_loss_arr[j, k]
+              demo_loss = torch.tensor(demo_list[j].metric[k], requires_grad=True)
+              subdom_val = torch.clamp(alpha[k]*(sample_loss - demo_loss) + 1, 0)    
+              subdom_tensor[j, k] =  subdom_val - subdom_constant       # subtract constant c to optimize for useful demonstation instead of avoiding from noisy ones
+              # torch.clamp(self.alpha[k] * (sample_loss - demo_loss) + 1 - self.subdom_constant, 0)
+              #grad_theta += self.subdom_tensor[j, k] * self.feature_matching(j)
+          
+      #print("--- %s end of compute_grad_theta ---" % (time.time() - start_time))
+      subdom_tensor_sum = torch.sum(subdom_tensor)
+      return subdom_tensor_sum
+    
+  def subdom_loss_t(self):
+    self.subdom_tensor = torch.zeros([self.num_of_demos, self.num_of_features]).cuda()
+    for j, x in enumerate(tqdm(self.demo_list)):
+      if j == 0:
+        self.subdom_constant = 0
+      else:
+        self.subdom_constant = self.get_subdom_constant()
+      for k in range(self.num_of_features):
+        sample_loss = self.sample_loss[j, k]
+        demo_loss = torch.tensor(self.demo_list[j].metric[k], requires_grad=True).cuda()
+        subdom_val = max(self.alpha[k]*(sample_loss - demo_loss) + 1, 0)    
+        self.subdom_tensor[j, k] =  subdom_val - self.subdom_constant
+        #grad_theta += self.subdom_tensor[j, k] * self.feature_matching(j)
+    return torch.sum(self.subdom_tensor)
+   
   def base_model(self):
-    self.model_name = "logistic-regression"
+    self.model_name = "NN"
     train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
     self.train_data = pd.read_csv(train_file_path, index_col=0)
 
     A = self.train_data[self.sensitive_feature]
     A_str = A.map(self.dict_map)
-    # Extract the target
+    
     Y = self.train_data[self.label]
     X = self.train_data.drop(columns=[self.label])
-
-    
     
     X_train, X_test, Y_train, Y_test, A_train, A_test, A_str_train, A_str_test = train_test_split(
         X,
@@ -176,20 +160,37 @@ class Super_human:
         random_state=12345,
         stratify=Y
         )
-    # ###############################################
-    # balanced_idx1 = X_train[Y_train==1].index
-    # pp_train_idx = balanced_idx1.union(Y_train[Y_train==0].sample(n=balanced_idx1.size, random_state=1234).index)
-    # X_train = X_train.loc[pp_train_idx, :]
-    # Y_train = Y_train.loc[pp_train_idx]
-    # A_train = A_train.loc[pp_train_idx]
-    # #################################################
-
-    self.model_obj = LR_base_superhuman_model() #LogisticRegression(**self.logi_params)
-    print("self.model_obj.type: ", self.model_obj.type)
-    print(Y_train)
-    self.model_obj.fit(X_train, Y_train)
-    self.pred_scores = self.model_obj.predict_proba(X_test)
-
+    losses = []
+    self.model_obj = Net(X_train.shape[1]).cuda()
+    optim1 = optim.Adam(list(self.model_obj.parameters()), lr=0.1)
+    optim2 = optim.Adam([self.alpha], lr=0.1)
+    for i in range(200):
+      print("epoch:", i)
+      self.sample_superhuman()
+      self.get_samples_demo_indexed()
+      self.get_sample_loss()
+      loss = self.subdom_loss_t()
+      optim2.zero_grad()
+      optim1.zero_grad()
+      (loss).backward()
+      optim1.step()
+      optim2.step()
+      losses.append(loss.item())
+      print("loss: ", loss.item())
+      # new_alpha = self.compute_alpha()
+      # self.update_model_alpha(new_alpha)
+    # write losses to file
+    with open("losses.txt", "w") as f:
+      for loss in losses:
+        f.write(str(loss) + "\n")
+    torch.save(self.model_obj.state_dict(), 'model.pth')
+    
+    
+    X_test = X_test.to_numpy(dtype=np.float32)
+    # X_test to torch
+    X_test = torch.from_numpy(X_test).cuda()
+    self.pred_scores = self.model_obj(X_test)
+    print(self.pred_scores)
     if self.dataset == 'COMPAS':
       mode = 'demographic_parity' #'equalized_opportunity' # #'equalized_odds'
       C = .005
@@ -235,8 +236,8 @@ class Super_human:
                  "Y_test": Y_test,
                  "A_str_train": A_str_train,
                  "A_str_test": A_str_test}
-    
-    model_file_dir = os.path.join(self.model_path, 'base_model_' + dataset + '.pickle') 
+    print(self.dataset)
+    model_file_dir = os.path.join(self.model_path, 'base_model_' + self.dataset + '.pickle') 
     with open(model_file_dir, 'wb') as handle:  #with open(f'base_model_{dataset}.pickle', 'wb') as handle:
         pickle.dump(self.base_dict, handle)
 
@@ -390,10 +391,10 @@ class Super_human:
     dataset_pp = dataset_ref.iloc[idx_train].reset_index(drop=True) # use only pp portion of the data and leave SH Test portion
     dataset_sh = dataset_ref.iloc[idx_test].reset_index(drop=True)
 
-    
-    train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
+    # dataset name, baseline, lr_theta, num_of_demos, noise_ratio
+    train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline,\
+      lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
-    print("u running 5?")
     print(train_file_path)
     print(train_data_filename)
     test_data_filename = "test_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
@@ -414,6 +415,7 @@ class Super_human:
       dataset_temp['prev_index'] = index_list
       ##########################################################################
       new_demo = self.split_data(model, alpha=beta, dataset=dataset_temp,  mode="post-processing")
+      print("before:", new_demo)
       if self.noise == True:
         new_demo = self.add_noise_new(new_demo)
       print("rnning metrics")
@@ -427,7 +429,7 @@ class Super_human:
       new_demo.metric_df = metrics
       for k in range(self.num_of_features):
         new_demo.metric[k] = new_demo.metric_df.loc[self.feature[k]][self.demo_baseline]
-
+      print(new_demo)
       self.demo_list.append(new_demo)
       print("demo {}".format(i))
 
@@ -519,13 +521,17 @@ class Super_human:
     print("demo_list file name: ")
     print(demo_list_filename)
     self.demo_list = load_object(file_dir, demo_list_filename, -1)
-    
+    # print demo_list attributes
+    print("demo_list attributes: ")
+    print(self.demo_list[0].__dict__.keys())
     return self.demo_list
 
   def get_model_pred(self, item): # an item is one row of the dataset
     # print(type(item))
     item = np.asarray(item, dtype=np.float32)
-    score = self.model_obj.predict_proba(item).squeeze() # [p(y = 0), p(y = 1)]
+    # convert to tensor
+    item = torch.from_numpy(item).cuda()
+    score = self.model_obj(item).squeeze()
     return score
 
   def sample_from_prob(self, dist, size):
@@ -534,7 +540,8 @@ class Super_human:
     #print("dist: ", dist)
     #print(sum(dist))
     dist /= dist.sum()
-    sample_preds = np.random.choice(preds, size, True, dist)
+    dist_t = dist.cpu().detach().numpy()
+    sample_preds = np.random.choice(preds, size, True, dist_t)
     return sample_preds
 
   def sample_superhuman(self):
@@ -542,24 +549,22 @@ class Super_human:
     print("")
     train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
-
+    print(train_file_path)
     self.train_data = pd.read_csv(train_file_path, index_col=0)
     X = self.train_data.drop(columns=[self.label]).to_numpy(dtype=np.float32)
     data_size, feature_size = self.train_data.shape
     self.sample_matrix = np.zeros((self.num_of_demos, data_size)) #np.array([[-1 for _ in range(data_size)] for _ in range(num_of_samples)]) # create a matrix of size [num_of_samples * data_set_size]. Each row is a sample from our model that predicts the self.label of dataset.
+    print(self.num_of_demos)
     for j in range(data_size):
       # print("check X[j] here", type(X[j]))
       probs = self.get_model_pred(item = [X[j]] )
       self.sample_matrix[:,j] = self.sample_from_prob(dist = probs, size = self.num_of_demos) # return a vector of size num_of_samples (50) with self.label prediction samples for j_th item of the dataset
-          
     print("--- %s end of sample_superhuman ---" % (time.time() - start_time))
     return self.sample_matrix
 
   def get_samples_demo_indexed(self):
-    start_time = time.time()
     sample_size = self.demo_list[0].idx_test.size
     self.sample_matrix_demo_indexed = np.zeros((self.num_of_demos, sample_size))
-    
     for i in range(self.num_of_demos):
       demo = self.demo_list[i]
       self.sample_matrix_demo_indexed[i,:] = self.sample_matrix[i,:][demo.idx_test]
@@ -580,7 +585,7 @@ class Super_human:
       metric_df = get_metrics_df(models_dict = models_dict, y_true = y, group = A_str, feature = feature, is_demo = False) #### takes so much time!!! #metric_df = get_metrics_df(models_dict = models_dict, y_true = demo.test_y, group = demo.test_A_str)
       for feature_index in range(self.num_of_features):
         self.sample_loss[demo_index, feature_index] = metric_df.loc[self.feature[feature_index]]["Super_human"] #metric[feature_index]
-    
+    print(self.sample_loss)
     print("--- %s end of get_sample_loss ---" % (time.time() - start_time))
 
   def get_demo_loss(self, demo_index, feature_index):
@@ -589,7 +594,7 @@ class Super_human:
 
   def get_subdom_constant(self):
     if self.c == None:  # only update it in the first iteration with the initial sample values
-      subdom_constant = np.mean(self.subdom_tensor)
+      subdom_constant = torch.mean(self.subdom_tensor).cuda()
     return subdom_constant
 
   def get_subdom_tensor(self):
@@ -644,35 +649,7 @@ class Super_human:
     #np.save('subdom_tensor.npy', self.subdom_tensor)
     return subdom_tensor_sum, grad_theta
 
-  # def compute_alpha(self):
-  #   start_time = time.time()
-  #   alpha = np.ones(self.num_of_features)
-  
-  #   for k in range(self.num_of_features):
-  #     sorted_demos = []
-  #     alpha_candidate = []
-  #     for j in range(self.num_of_demos):
-  #       sample_loss = self.sample_loss[j, k]
-  #       demo_loss = self.demo_list[j].metric[k] 
-  #       sorted_demos.append((demo_loss, sample_loss))
-      
-  #     sorted_demos.sort(key = lambda x: x[0]) #dominated_demos.sort(key = lambda x: x[0], reverse=True)   # sort based on demo loss
-  #     sorted_demos = np.array(sorted_demos)
-  #     alpha[k] = np.mean(self.alpha) #100 #max(self.alpha) #np.mean(self.alpha) # default value in case it didn't change using previous alpha values
-  #     for m, demo in enumerate(sorted_demos):
-  #       avg_sample_loss = np.mean([demo[1] for demo in sorted_demos])
-  #       if (demo[0] > demo[1]):
-  #         alpha[k] = min(100, 1.0/(demo[0] - demo[1]))  ### limit max alpha to 100
-  #       if (avg_sample_loss + self.lamda) <= np.mean([x[0] for x in sorted_demos[0:m+1]]): #if (demo[2]) <= np.mean([x[1] for x in dominated_demos[0:m+1]] and demo[0] > 0):
-  #         break
-
-  #   print("--- %s end of compute_alpha ---" % (time.time() - start_time))
-  #   print("alpha : ")
-  #   print(alpha)
-  #   #model_params = {"eval": self.eval}
-  #   find_gamma_superhuman(self.demo_list, self.model_params)
-  #   return alpha
-
+ 
   def compute_alpha(self):
     start_time = time.time()
     alpha = np.ones(self.num_of_features)
@@ -864,22 +841,26 @@ class Super_human:
     #print("len(X): ", X.shape)
     #print("len(Y): ", Y_test.shape)
     #print("self.model_obj.predict_proba(X):", self.model_obj.predict_proba(X))
-    print("THIS IS XXXXXXX")
-    print("THIS IS PREDICT PROBAB XXXXXXX")
+    print("THIS IS X")
+    print("THIS IS PREDICT PROBAB X")
     # test = self.model_obj.predict_proba(X)
 
     if isinstance(X, pd.DataFrame):
       X = X.to_numpy(dtype=np.float32)
       X = torch.from_numpy(X)
-    scores = self.model_obj.predict_proba(X)[:, 1]
-
+      
+    print(self.model_obj)
+    scores = self.model_obj(X.cuda())[:, 1]
+    print(scores)
+    print(np.mean(Y_train))
     # Predictions (0 or 1) on test set
     preds = (scores >= np.mean(Y_train)) * 1
+    print(preds)
     #preds = predict_nn(X, Y_train, A, X, Y_test, A, self)
     # Metrics
     eval = pd.DataFrame(index = [self.feature[i] for i in range(self.num_of_features)]) #['Demographic parity difference', 'False negative rate difference', 'ZeroOne']
     models_dict = {
-              "Super_human": (preds, preds)}
+              "Super_human": (preds.cpu().data.numpy(), preds.cpu().data.numpy())}
     eval = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str, feature = feature, is_demo = False)
     return eval
 
@@ -894,14 +875,17 @@ class Super_human:
     self.grad_theta, subdom_tensor_sum_arr, self.eval, self.gamma_superhuman_arr = [], [], [], []
     Y = self.train_data[self.label]
     X = self.train_data.drop(columns=[self.label])
-    print("self.base_model_type: ", self.model_obj.type)
     if self.base_model_type == 'NN':
       self.subdom_constant = 0
-      self.sample_superhuman() # update self.sample_matrix with new samples from new theta
+      # must be in training loop
+      self.sample_superhuman()
       self.get_samples_demo_indexed()
       self.get_sample_loss()
-      self.model_obj = NN_base_superhuman_model(self.demo_list, self.num_of_demos, self.num_of_features, self.subdom_constant, self.alpha, self.sample_loss)
-      self.model_obj.fit(X, Y)
+      self.model_obj = Net()
+      # training loop 
+      self.model_obj.fit()
+    return
+      # self.model_obj.fit(X, Y)
     gamma_degrade = 0
     print("after it returned")
     for i in tqdm(range(iters)):
@@ -913,7 +897,6 @@ class Super_human:
       print("get sample")
       self.get_sample_loss()
       alpha = self.get_model_alpha()
-      print("we running here in tqdm?")
       if isinstance(self.model_obj, LR_base_superhuman_model):
         print("model is LR_base_superhuman_model")
         # get the current theta and alpha
@@ -1067,10 +1050,13 @@ if __name__ == "__main__":
 
   elif args['task'] == 'train':
     print("lr_theta: ", lr_theta)
+    # {'dataset': 'Adult', 'iters': 30, 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc', 'dp', 'eqodds', 'prp'], 'base_model_type': 'LR', 'num_experiment': 10}
     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
-    sh_obj.base_model()
     sh_obj.read_demo_list()
-    sh_obj.update_model(lr_theta, iters)
+    sh_obj.base_model()
+    # sh_obj.read_demo_list()
+    # sh_obj.update_model(lr_theta, iters)
+    sh_obj.test_model(-1)
 
   elif args['task'] == 'test':
     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)

@@ -293,8 +293,9 @@ def get_metrics_df(models_dict, y_true, group, feature, is_demo = False):
         metrics_dict_subset = metrics_dict
     else:                   # otherwise only store the metrics we care about
         metrics_dict_subset = {k: metrics_dict[k] for k in feature.values()}
+        
     for metric_name, (metric_func, use_preds) in metrics_dict_subset.items():
-        df_dict[metric_name] = [metric_func(preds) if use_preds else metric_func(scores) 
+        df_dict[metric_name] = [metric_func(preds) if use_preds else metric_func(scores)
                                 for model_name, (preds, scores) in models_dict.items()]
     return pd.DataFrame.from_dict(df_dict, orient="index", columns=models_dict.keys())
 
