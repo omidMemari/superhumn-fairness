@@ -60,3 +60,5 @@ $ python plot.py -t noise-test -n True -d [Adult|COMPAS] -f inacc dp eqodds prp
 
 python main.py -t train -n False -m "NN" -d Adult -f inacc dp eqodds prp
 python main.py -t train -n False -d Adult -f inacc dp eqodds prp
+python main.py -t test -n False -m "NN" -d Adult -f inacc dp eqodds prp
+python main.py -t prepare-demos -n False -d Adult -f inacc dp eqodds prp

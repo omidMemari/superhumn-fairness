@@ -55,7 +55,9 @@ class Super_human:
     self.num_of_features = num_of_features
     self.feature = feature
     # self.alpha is torch.nn.Parameter and it is a list of [1.0 for _ in range(self.num_of_features)]
-    self.alpha = torch.nn.parameter.Parameter(torch.ones(num_of_features).cuda(), requires_grad=True)
+    # self.alpha = torch.nn.parameter.Parameter(torch.ones(num_of_features).cuda(), requires_grad=True)
+    # self.alpha = torch.nn.parameter.Parameter(torch.Tensor([100.0, 100.0, 100.0, 100.0]), requires_grad=True).cuda()
+    self.alpha = [torch.nn.parameter.Parameter(torch.Tensor([100.0]), requires_grad=True) for _ in range(self.num_of_features)]
     # self.alpha = np.ones(num_of_features)
     self.gamma_superhuman = [0.0 for _ in range(self.num_of_features)]
     self.label = label_dict[dataset] ##
@@ -135,9 +137,9 @@ class Super_human:
         demo_loss = torch.tensor(self.demo_list[j].metric[k], requires_grad=True).cuda()
         subdom_val = max(self.alpha[k]*(sample_loss - demo_loss) + 1, 0)    
         self.subdom_tensor[j, k] =  subdom_val - self.subdom_constant
-        #grad_theta += self.subdom_tensor[j, k] * self.feature_matching(j)
+        # grad_theta += self.subdom_tensor[j, k] * self.feature_matching(j)
     return torch.sum(self.subdom_tensor)
-   
+  
   def base_model(self):
     self.model_name = "NN"
     train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
@@ -167,10 +169,10 @@ class Super_human:
     Y_train = Y_train.to_numpy(dtype=np.float32)
     Y_train = torch.from_numpy(Y_train).cuda()
     crtiteron = torch.nn.CrossEntropyLoss()
-    
+
     self.model_obj = Net(X_train.shape[1]).cuda()
     self.model_obj.optimizer = optim.Adam(self.model_obj.parameters(), lr=self.lr_theta)
-    for i in range(200):
+    for i in range(100):
       self.model_obj.train()
       self.model_obj.zero_grad()
       pred = self.model_obj(X_train)
@@ -309,9 +311,7 @@ class Super_human:
     result = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str_test, feature = feature, is_demo = True)
 
     return result
-
-
-    
+  
   def split_data(self, model, alpha=0.5, dataset=None,  mode="post-processing"):
     # Assign dataset to temporary variable
     dataset_temp = dataset.copy(deep=True)
@@ -561,7 +561,6 @@ class Super_human:
       self.sample_matrix_demo_indexed[i,:] = self.sample_matrix[i,:][demo.idx_test]
     return self.sample_matrix_demo_indexed
     
-
   def get_sample_loss(self):
     start_time = time.time()
     self.sample_loss = np.zeros((self.num_of_demos, self.num_of_features))
@@ -576,7 +575,6 @@ class Super_human:
       metric_df = get_metrics_df(models_dict = models_dict, y_true = y, group = A_str, feature = feature, is_demo = False) #### takes so much time!!! #metric_df = get_metrics_df(models_dict = models_dict, y_true = demo.test_y, group = demo.test_A_str)
       for feature_index in range(self.num_of_features):
         self.sample_loss[demo_index, feature_index] = metric_df.loc[self.feature[feature_index]]["Super_human"] #metric[feature_index]
-    print(self.sample_loss)
     print("--- %s end of get_sample_loss ---" % (time.time() - start_time))
 
   def get_demo_loss(self, demo_index, feature_index):
@@ -619,7 +617,6 @@ class Super_human:
 
     return phi_X_Y - self.exp_phi_X_Y
 
-
   def compute_grad_theta(self):
     start_time = time.time()
     self.subdom_tensor = np.zeros((self.num_of_demos, self.num_of_features)) 
@@ -640,7 +637,6 @@ class Super_human:
     #np.save('subdom_tensor.npy', self.subdom_tensor)
     return subdom_tensor_sum, grad_theta
 
- 
   def compute_alpha(self):
     start_time = time.time()
     alpha = np.ones(self.num_of_features)
@@ -799,7 +795,6 @@ class Super_human:
       metrics[baseline]['ZeroOne'] = exp_zeroone
       return metrics
 
-
   def eval_model(self, mode):
     if mode == "train":
       train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
@@ -866,25 +861,40 @@ class Super_human:
     self.grad_theta, subdom_tensor_sum_arr, self.eval, self.gamma_superhuman_arr = [], [], [], []
     Y = self.train_data[self.label]
     X = self.train_data.drop(columns=[self.label])
+    losses = []
     if self.base_model_type == 'NN':
       optim1 = optim.Adam(list(self.model_obj.parameters()), lr=0.1)
-      optim2 = optim.Adam([self.alpha], lr=0.1)
-      for i in range(10):
-        print("epoch:", i)
+      # optim2 is for each element in self.alpha
+      optim2 = [optim.Adam([self.alpha[k]], lr=0.1) for k in range(self.num_of_features)]
+      for k in range(self.num_of_features):
+        self.alpha[k] = self.alpha[k].cuda()
+      for i in range(100):
+        self.model_obj.train()
         self.sample_superhuman()
         self.get_samples_demo_indexed()
         self.get_sample_loss()
         loss = self.subdom_loss_t()
-        optim2.zero_grad()
         optim1.zero_grad()
+        optim2[k].zero_grad()
         (loss).backward()
         optim1.step()
-        optim2.step()
-        print(self.alpha)
-        print("loss: ", loss.item())
-        print(self.eval_model(mode = "train"))
-      # save model  
+        optim2[k].step()
+      print("loss: ", loss.item())
+      print(self.alpha)
+      # self.alpha = torch.clamp(self.alpha, 0, 100)
+      # clamp parameters
+        
+      print("evaling")
+      print("alphas: ",self.alpha)
+      self.eval_model(mode = "train")
+      print("loss: ", loss.item())
+      
+      # write loss to losses.txt
+      with open("losses.txt", "a") as f:
+        f.write(str(loss.item()) + "\n")
+        
       torch.save(self.model_obj.state_dict(), 'model.pth')
+      
     return
       # self.model_obj.fit(X, Y)
     gamma_degrade = 0
@@ -990,8 +1000,6 @@ class Super_human:
     self.model_obj.load_state_dict(torch.load('model.pth'))
     self.model_obj.eval()
     
-
-
   def test_model(self, exp_idx):
     eval_sh = self.eval_model(mode = "test-sh")
     print()
@@ -1026,7 +1034,6 @@ class Super_human:
     file_dir = os.path.join(self.test_data_path)
     store_object(self.model_params, file_dir, experiment_filename, exp_idx)
 
-
 if __name__ == "__main__":
   parser = argparse.ArgumentParser(description='Description of your program')
   parser.add_argument('-t','--task', help='enter the task to do', required=True)
@@ -1060,7 +1067,6 @@ if __name__ == "__main__":
     print("lr_theta: ", lr_theta)
     # {'dataset': 'Adult', 'iters': 30, 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc', 'dp', 'eqodds', 'prp'], 'base_model_type': 'LR', 'num_experiment': 10}
     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
-    
     sh_obj.base_model()
     sh_obj.read_demo_list()
     sh_obj.update_model(lr_theta, iters)
