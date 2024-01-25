@@ -12,3 +12,4 @@ data/*
 dataset/acs_*
 dataset/data/
 __pycache__/*
+spf/*
