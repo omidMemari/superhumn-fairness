@@ -61,10 +61,12 @@ class Super_human:
     # self.alpha = [torch.nn.parameter.Parameter(torch.Tensor([100.0]), requires_grad=True) for _ in range(self.num_of_features)]
     
     # init with prior
-    self.alpha = [torch.nn.parameter.Parameter(torch.Tensor([100.]), requires_grad=True),\
-      torch.nn.parameter.Parameter(torch.Tensor([63.29229449]), requires_grad=True),\
-      torch.nn.parameter.Parameter(torch.Tensor([6.26084545]), requires_grad=True),\
-      torch.nn.parameter.Parameter(torch.Tensor([5.50424769]), requires_grad=True)]
+    # self.alpha = torch.nn.ParameterList([torch.nn.parameter.Parameter(torch.Tensor([100.]), requires_grad=True),\
+    #   torch.nn.parameter.Parameter(torch.Tensor([63.29229449]), requires_grad=True),\
+    #   torch.nn.parameter.Parameter(torch.Tensor([6.26084545]), requires_grad=True),\
+    #   torch.nn.parameter.Parameter(torch.Tensor([5.50424769]), requires_grad=True)])
+    self.alpha = torch.tensor([100.0, 63.29229449, 6.26084545, 5.50424769], requires_grad=True, dtype= torch.float).cuda()
+    
     # self.alpha = np.ones(num_of_features)
     self.gamma_superhuman = [0.0 for _ in range(self.num_of_features)]
     self.label = label_dict[dataset] ##
@@ -165,10 +167,6 @@ class Super_human:
       self.num_of_demos = num_of_demos
       self.num_of_features = num_of_features
       self.subdom_constant = subdom_constant
-      self.alpha = torch.nn.ParameterList([torch.nn.parameter.Parameter(torch.Tensor([100.]).cuda(), requires_grad=True),\
-            torch.nn.parameter.Parameter(torch.Tensor([63.29229449]).cuda(), requires_grad=True),\
-            torch.nn.parameter.Parameter(torch.Tensor([6.26084545]).cuda(), requires_grad=True),\
-            torch.nn.parameter.Parameter(torch.Tensor([5.50424769]).cuda(), requires_grad=True)])
       self.sample_loss = sample_loss
       self.get_loss = 0
       
@@ -186,7 +184,7 @@ class Super_human:
           # grad_theta += self.subdom_tensor[j, k] * self.feature_matching(j)
       return torch.sum(self.subdom_tensor)
     
-    def forward(self, x):
+    def forward(self):
       return self.subdom_loss_t(self.demo_list, self.num_of_demos, self.num_of_features, self.subdom_constant, self.alpha, self.sample_loss)
     
 
@@ -917,30 +915,20 @@ class Super_human:
     self.sample_loss = np.zeros((self.num_of_demos, self.num_of_features))
     if self.base_model_type == 'NN':
       optim1 = optim.Adam(list(self.model_obj.parameters()), lr=0.1)
-      loss = self.loss_fn(self.demo_list, self.num_of_demos, self.num_of_features, 0, self.sample_loss)
-      
-      self.sample_loss = loss(0)
-      print(self.sample_loss)
-      exit()
-      # crtiteron = torch.nn.CrossEntropyLoss()
-      # optim2 is for each element in self.alpha
-      # optim2 = [optim.Adam([self.alpha[k]], lr=0.1) for k in range(self.num_of_features)]
-      # for k in range(self.num_of_features):
-      #   self.alpha[k] = self.alpha[k].cuda() This is moved to model.py
- 
-      # joint optimization
+      optim2 = optim.Adam(list(self.alpha), lr=0.1)
+
       for i in range(30):
         self.model_obj.train()
         self.sample_superhuman()
         self.get_samples_demo_indexed()
         self.get_sample_loss()
-        # loss = self.loss_fn(self.demo_list, self.num_of_demos, self.num_of_features, 0, self.sample_loss)
+        loss = self.subdom_loss_t(self.demo_list, self.num_of_demos, self.num_of_features, self.subdom_constant, self.alpha, self.sample_loss)
         optim1.zero_grad()
-        loss = self.sample_loss(self.demo_list, self.num_of_demos, self.num_of_features, 0, self.sample_loss)
-        # optim2.zero_grad()
-        # optim2.step()
+        optim2.zero_grad()
+        # loss_val = loss()
+        # loss_val.backward()
         optim1.step()
-        
+        optim2.step()
         losses.append(loss.get_loss)
       
       # self.alpha = torch.clamp(self.alpha, 0, 100)
@@ -951,7 +939,7 @@ class Super_human:
           f.write("\n")
   
         with open("losses.txt", "a") as f:
-          f.write(str(loss.get_loss) + "\n")
+          f.write(str(loss_val) + "\n")
           
       self.eval_model(mode = "train")
       # print("loss: ", loss.item())
