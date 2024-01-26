@@ -57,7 +57,14 @@ class Super_human:
     # self.alpha is torch.nn.Parameter and it is a list of [1.0 for _ in range(self.num_of_features)]
     # self.alpha = torch.nn.parameter.Parameter(torch.ones(num_of_features).cuda(), requires_grad=True)
     # self.alpha = torch.nn.parameter.Parameter(torch.Tensor([100.0, 100.0, 100.0, 100.0]), requires_grad=True).cuda()
-    self.alpha = [torch.nn.parameter.Parameter(torch.Tensor([100.0]), requires_grad=True) for _ in range(self.num_of_features)]
+    # init 100 test
+    # self.alpha = [torch.nn.parameter.Parameter(torch.Tensor([100.0]), requires_grad=True) for _ in range(self.num_of_features)]
+    
+    # init with prior
+    self.alpha = [torch.nn.parameter.Parameter(torch.Tensor([100.]), requires_grad=True),\
+      torch.nn.parameter.Parameter(torch.Tensor([63.29229449]), requires_grad=True),\
+      torch.nn.parameter.Parameter(torch.Tensor([6.26084545]), requires_grad=True),\
+      torch.nn.parameter.Parameter(torch.Tensor([5.50424769]), requires_grad=True)]
     # self.alpha = np.ones(num_of_features)
     self.gamma_superhuman = [0.0 for _ in range(self.num_of_features)]
     self.label = label_dict[dataset] ##
@@ -124,21 +131,65 @@ class Super_human:
       #print("--- %s end of compute_grad_theta ---" % (time.time() - start_time))
       subdom_tensor_sum = torch.sum(subdom_tensor)
       return subdom_tensor_sum
-    
-  def subdom_loss_t(self):
-    self.subdom_tensor = torch.zeros([self.num_of_demos, self.num_of_features]).cuda()
-    for j, x in enumerate(tqdm(self.demo_list)):
+  # def subdom_loss_t_backup(self, demo_list, num_of_demos, num_of_features, subdom_constant, alpha, sample_loss):
+  #   self.subdom_tensor = torch.zeros([self.num_of_demos, self.num_of_features]).cuda()
+  #   for j, x in enumerate(tqdm(self.demo_list)):
+  #     if j == 0:
+  #       self.subdom_constant = 0
+  #     else:
+  #       self.subdom_constant = self.get_subdom_constant()
+  #     for k in range(self.num_of_features):
+  #       demo_loss = torch.tensor(self.demo_list[j].metric[k], requires_grad=True).cuda()
+  #       subdom_val = max(self.alpha[k]*(self.sample_loss[j, k] - demo_loss) + 1, 0)    
+  #       self.subdom_tensor[j, k] =  subdom_val - self.subdom_constant
+  #       # grad_theta += self.subdom_tensor[j, k] * self.feature_matching(j)
+  #   return torch.sum(self.subdom_tensor)
+  def subdom_loss_t(self, demo_list, num_of_demos, num_of_features, subdom_constant, alpha, sample_loss):
+    self.subdom_tensor = torch.zeros([num_of_demos, num_of_features]).cuda()
+    for j, x in enumerate(tqdm(demo_list)):
       if j == 0:
-        self.subdom_constant = 0
+        self.subdom_constant = subdom_constant
       else:
-        self.subdom_constant = self.get_subdom_constant()
-      for k in range(self.num_of_features):
-        sample_loss = self.sample_loss[j, k]
-        demo_loss = torch.tensor(self.demo_list[j].metric[k], requires_grad=True).cuda()
-        subdom_val = max(self.alpha[k]*(sample_loss - demo_loss) + 1, 0)    
+        self.subdom_constant = subdom_constant
+      for k in range(num_of_features):
+        demo_loss = torch.tensor(demo_list[j].metric[k], requires_grad=True).cuda()
+        subdom_val = max(alpha[k]*(sample_loss[j, k] - demo_loss) + 1, 0)    
         self.subdom_tensor[j, k] =  subdom_val - self.subdom_constant
         # grad_theta += self.subdom_tensor[j, k] * self.feature_matching(j)
     return torch.sum(self.subdom_tensor)
+  
+  class loss_fn(torch.nn.Module):
+    def __init__(self, demo_list, num_of_demos, num_of_features, subdom_constant, sample_loss):
+      super().__init__()
+      self.demo_list = demo_list
+      self.num_of_demos = num_of_demos
+      self.num_of_features = num_of_features
+      self.subdom_constant = subdom_constant
+      self.alpha = torch.nn.ParameterList([torch.nn.parameter.Parameter(torch.Tensor([100.]).cuda(), requires_grad=True),\
+            torch.nn.parameter.Parameter(torch.Tensor([63.29229449]).cuda(), requires_grad=True),\
+            torch.nn.parameter.Parameter(torch.Tensor([6.26084545]).cuda(), requires_grad=True),\
+            torch.nn.parameter.Parameter(torch.Tensor([5.50424769]).cuda(), requires_grad=True)])
+      self.sample_loss = sample_loss
+      self.get_loss = 0
+      
+    def subdom_loss_t(self, demo_list, num_of_demos, num_of_features, subdom_constant, alpha, sample_loss):
+      self.subdom_tensor = torch.zeros([num_of_demos, num_of_features]).cuda()
+      for j, x in enumerate(tqdm(demo_list)):
+        if j == 0:
+          self.subdom_constant = subdom_constant
+        else:
+          self.subdom_constant = subdom_constant
+        for k in range(num_of_features):
+          demo_loss = torch.tensor(demo_list[j].metric[k], requires_grad=True).cuda()
+          subdom_val = max(alpha[k]*(sample_loss[j, k] - demo_loss) + 1, 0)    
+          self.subdom_tensor[j, k] =  subdom_val - self.subdom_constant
+          # grad_theta += self.subdom_tensor[j, k] * self.feature_matching(j)
+      return torch.sum(self.subdom_tensor)
+    
+    def forward(self, x):
+      return self.subdom_loss_t(self.demo_list, self.num_of_demos, self.num_of_features, self.subdom_constant, self.alpha, self.sample_loss)
+    
+
   
   def base_model(self):
     self.model_name = "NN"
@@ -172,7 +223,7 @@ class Super_human:
 
     self.model_obj = Net(X_train.shape[1]).cuda()
     self.model_obj.optimizer = optim.Adam(self.model_obj.parameters(), lr=self.lr_theta)
-    for i in range(100):
+    for i in range(30):
       self.model_obj.train()
       self.model_obj.zero_grad()
       pred = self.model_obj(X_train)
@@ -564,6 +615,7 @@ class Super_human:
   def get_sample_loss(self):
     start_time = time.time()
     self.sample_loss = np.zeros((self.num_of_demos, self.num_of_features))
+    self.sample_loss = torch.from_numpy(self.sample_loss).cuda()
     for demo_index, x in enumerate(tqdm(self.demo_list)):
       demo = self.demo_list[demo_index]
       sample_preds = self.sample_matrix_demo_indexed[demo_index,:]
@@ -862,36 +914,51 @@ class Super_human:
     Y = self.train_data[self.label]
     X = self.train_data.drop(columns=[self.label])
     losses = []
+    self.sample_loss = np.zeros((self.num_of_demos, self.num_of_features))
     if self.base_model_type == 'NN':
       optim1 = optim.Adam(list(self.model_obj.parameters()), lr=0.1)
+      loss = self.loss_fn(self.demo_list, self.num_of_demos, self.num_of_features, 0, self.sample_loss)
+      
+      self.sample_loss = loss(0)
+      print(self.sample_loss)
+      exit()
+      # crtiteron = torch.nn.CrossEntropyLoss()
       # optim2 is for each element in self.alpha
-      optim2 = [optim.Adam([self.alpha[k]], lr=0.1) for k in range(self.num_of_features)]
-      for k in range(self.num_of_features):
-        self.alpha[k] = self.alpha[k].cuda()
-      for i in range(100):
+      # optim2 = [optim.Adam([self.alpha[k]], lr=0.1) for k in range(self.num_of_features)]
+      # for k in range(self.num_of_features):
+      #   self.alpha[k] = self.alpha[k].cuda() This is moved to model.py
+ 
+      # joint optimization
+      for i in range(30):
         self.model_obj.train()
         self.sample_superhuman()
         self.get_samples_demo_indexed()
         self.get_sample_loss()
-        loss = self.subdom_loss_t()
+        # loss = self.loss_fn(self.demo_list, self.num_of_demos, self.num_of_features, 0, self.sample_loss)
         optim1.zero_grad()
-        optim2[k].zero_grad()
-        (loss).backward()
+        loss = self.sample_loss(self.demo_list, self.num_of_demos, self.num_of_features, 0, self.sample_loss)
+        # optim2.zero_grad()
+        # optim2.step()
         optim1.step()
-        optim2[k].step()
-      print("loss: ", loss.item())
-      print(self.alpha)
+        
+        losses.append(loss.get_loss)
+      
       # self.alpha = torch.clamp(self.alpha, 0, 100)
       # clamp parameters
-        
-      print("evaling")
-      print("alphas: ",self.alpha)
+        with open("alphas.txt", "a") as f:
+          for i in loss.alpha:
+            f.write(str(i) + " ")
+          f.write("\n")
+  
+        with open("losses.txt", "a") as f:
+          f.write(str(loss.get_loss) + "\n")
+          
       self.eval_model(mode = "train")
-      print("loss: ", loss.item())
+      # print("loss: ", loss.item())
       
       # write loss to losses.txt
-      with open("losses.txt", "a") as f:
-        f.write(str(loss.item()) + "\n")
+      # with open("losses.txt", "a") as f:
+      #   f.write(str(loss.item()) + "\n")
         
       torch.save(self.model_obj.state_dict(), 'model.pth')
       

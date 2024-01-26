@@ -80,7 +80,7 @@ class Net(nn.Module):
         self.fc3 = nn.Linear(256, 2)
         self.out = nn.Softmax(dim=1)
         self.dropout1 = nn.Dropout(0.2)
-        self.dropout2 = nn.Dropout(0.2)
+        self.dropout2 = nn.Dropout(0.2)        
         torch.set_default_tensor_type(torch.FloatTensor)
 
     def forward(self, x):
