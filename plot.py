@@ -27,6 +27,7 @@ def plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_ba
     #sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
 
     demo_list = sh_obj.read_demo_list()
+    model_params = model_params[0]
     alpha = model_params["alpha"]
     print("alpha: ", alpha)
     alpha = [1 / x for x in alpha]
@@ -119,6 +120,7 @@ def plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_ba
             plt.title(dataset)
             plot_file_name = short[feature[j]] + "_vs_" + short[feature[i]] + "_{}_{}_{}".format(dataset, model_params['demo_baseline'], noise_ratio).replace('.','-') + ".pdf"
             plots_path_dir = os.path.join(sh_obj.plots_path, plot_file_name) # short[feature[j]] + "_vs_"+ short[feature[i]] + ".png")
+            print("see plot path here: ", plots_path_dir)
             plt.savefig(plots_path_dir)
 
 
@@ -277,6 +279,7 @@ if __name__ == "__main__":
         # plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type, model_params)
         if noise==False: noise_ratio = 0.0
         sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
+        print("See plot path here: ",sh_obj.plots_path)
         experiment_filename = make_experiment_filename(dataset = dataset, demo_baseline= demo_baseline, lr_theta = lr_theta, num_of_demos = num_of_demos, noise_ratio = noise_ratio)
         file_dir = os.path.join(sh_obj.test_data_path)
         model_params = [load_object(file_dir,experiment_filename, -1)]

@@ -46,6 +46,50 @@ class base_superhuman_model:
         proba = self.predict_proba(X)
         return np.mean(np.where(Y == 1 , 1 - proba, proba))
 
+class LogisticRegression_pytorch(nn.Module):
+    def __init__(self, n_inputs, n_outputs):
+        super(LogisticRegression_pytorch, self).__init__()
+        self.linear = nn.Linear(n_inputs, n_outputs)
+        self.sigmoid = nn.Sigmoid()
+        self.softmax = nn.Softmax(dim = 1)
+        self.type = 'LR_pytorch'
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.01)
+        
+    def forward(self, x):
+        return self.softmax(self.linear(x))
+    # defaukt max_iter = 1000
+    def fit(self, X_train, Y_train, max_iter = 1000):
+        # weight_decay is l2
+        X_train = torch.tensor(X_train.to_numpy(), dtype=torch.float32)
+        Y_train = torch.tensor(Y_train.to_numpy(), dtype=torch.float32)
+        Y_train = Y_train.view(-1, 1)
+        criterion = nn.CrossEntropyLoss()
+        for epoch in range(max_iter):
+            self.optimizer.zero_grad()
+            outputs = self(X_train)
+            
+            loss = criterion(outputs, Y_train.squeeze().type(torch.LongTensor))
+            loss.backward()
+            self.optimizer.step()
+        return self
+    
+    def predict_proba(self, X):
+        # check if it is already in numpy format
+        if type(X) is list:
+            X = torch.tensor(X, dtype=torch.float32)
+        else:
+            X = torch.tensor(X.to_numpy(), dtype=torch.float32)
+        out = torch.cat((1 - self(X), self(X)), 1).detach().numpy()
+        return out
+    
+    def get_model_theta(self):
+        return self.linear.weight.data.numpy().ravel()
+    
+    def update_model_theta(self, new_theta):
+        self.linear.weight.data = torch.tensor([new_theta], dtype=torch.float32)
+        return self
+        
+    
 
 
 class LR_base_superhuman_model(base_superhuman_model):
@@ -53,14 +97,14 @@ class LR_base_superhuman_model(base_superhuman_model):
     def __init__(self):
         super().__init__()
         self.model = LogisticRegression(**self.logi_params)
-        self.type = "LR"
+        self.type = "LR base"
     
     def fit(self, X_train, Y_train):
         return self.model.fit(X_train, Y_train)
 
     def predict_proba(self, X):
-        return self.model.predict_proba(X)
-
+        out = self.model.predict_proba(X)
+        return out
     
     def get_model_theta(self):
         return self.model.coef_[0]
