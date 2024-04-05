@@ -24,7 +24,7 @@ from sklearn.linear_model import LogisticRegression
 from fairlearn.postprocessing import ThresholdOptimizer
 from util import compute_error, get_metrics_df, create_features_dict, find_gamma_superhuman, find_gamma_superhuman_all, load_object, store_object, make_demo_list_filename, make_experiment_filename
 from fair_logloss.fair_logloss import DP_fair_logloss_classifier, EOPP_fair_logloss_classifier, EODD_fair_logloss_classifier
-from model import NN_base_superhuman_model, LR_base_superhuman_model, LogisticRegression_pytorch
+from model import LR_base_superhuman_model, LogisticRegression_pytorch
 import torch
 
 default_args = {'dataset': 'Adult', 'iters': 30, 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc', 'dp', 'eqodds', 'prp'], 'base_model_type': 'LR', 'num_experiment': 10}
@@ -43,9 +43,9 @@ iters = default_args['iters']
 alpha = 0.5
 beta = 0.5
 lamda = 0.001
-#demo_baseline = "pp" #"fair_logloss" 
+
 model = "logistic_regression"
-noise_list = [0.2]#0.03, 0.04]#[0.06, 0.07, 0.08, 0.09]##[0.16, 0.17, 0.18, 0.19, 0.20]#[0.11, 0.12, 0.13, 0.14, 0.15]
+noise_list = [0.2]
 
 
 class Super_human:
@@ -55,20 +55,7 @@ class Super_human:
     self.num_of_demos = num_of_demos
     self.num_of_features = num_of_features
     self.feature = feature
-    # self.alpha is torch.nn.Parameter and it is a list of [1.0 for _ in range(self.num_of_features)]
-    # self.alpha = torch.nn.parameter.Parameter(torch.ones(num_of_features).cuda(), requires_grad=True)
-    # self.alpha = torch.nn.parameter.Parameter(torch.Tensor([100.0, 100.0, 100.0, 100.0]), requires_grad=True).cuda()
-    # init 100 test
-    # self.alpha = [torch.nn.parameter.Parameter(torch.Tensor([100.0]), requires_grad=True) for _ in range(self.num_of_features)]
-    
-    # init with prior
-    # self.alpha = torch.nn.ParameterList([torch.nn.parameter.Parameter(torch.Tensor([100.]), requires_grad=True),\
-    #   torch.nn.parameter.Parameter(torch.Tensor([63.29229449]), requires_grad=True),\
-    #   torch.nn.parameter.Parameter(torch.Tensor([6.26084545]), requires_grad=True),\
-    #   torch.nn.parameter.Parameter(torch.Tensor([5.50424769]), requires_grad=True)])
-    self.alpha = torch.tensor([100.0, 63.29229449, 6.26084545, 5.50424769], requires_grad=True, dtype= torch.float).cuda()
-    
-    # self.alpha = np.ones(num_of_features)
+    self.alpha = [1.0 for _ in range(self.num_of_features)]
     self.gamma_superhuman = [0.0 for _ in range(self.num_of_features)]
     self.label = label_dict[dataset] ##
     print("self.label: ", self.label)
@@ -188,10 +175,9 @@ class Super_human:
     def forward(self):
       return self.subdom_loss_t(self.demo_list, self.num_of_demos, self.num_of_features, self.subdom_constant, self.alpha, self.sample_loss)
     
-
   
   def base_model(self):
-    self.model_name = "NN"
+    self.model_name = "LR_pytorch"
     train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
     self.train_data = pd.read_csv(train_file_path, index_col=0)
@@ -264,7 +250,7 @@ class Super_human:
                  "A_str_test": A_str_test}
     print(self.dataset)
     model_file_dir = os.path.join(self.model_path, 'base_model_' + self.dataset + '.pickle') 
-    with open(model_file_dir, 'wb') as handle:  #with open(f'base_model_{dataset}.pickle', 'wb') as handle:
+    with open(model_file_dir, 'wb') as handle:
         pickle.dump(self.base_dict, handle)
 
   def run_demo_baseline(self, data_demo = data_demo):
@@ -860,8 +846,6 @@ class Super_human:
     #print("len(X): ", X.shape)
     #print("len(Y): ", Y_test.shape)
     #print("self.model_obj.predict_proba(X):", self.model_obj.predict_proba(X))
-    print("THIS IS X")
-    print("THIS IS PREDICT PROBAB X")
     # test = self.model_obj.predict_proba(X)
 
     if isinstance(X, pd.DataFrame):
@@ -869,7 +853,8 @@ class Super_human:
       X = torch.from_numpy(X)
       
     print(self.model_obj)
-    scores = self.model_obj(X.cuda())[:, 1]
+    print(type(X))
+    scores = self.model_obj(X)[:, 1]
     print(scores)
     print(np.mean(Y_train))
     # Predictions (0 or 1) on test set
@@ -961,10 +946,10 @@ class Super_human:
           log_prob_sum = torch.log(y_hat_probs).sum()
           loss += log_prob_sum * subdom
           
-          if j == 0:
-            self.subdom_constant = 0
-          else:
-            self.subdom_constant = self.get_subdom_constant()
+          # if j == 0:
+          #   self.subdom_constant = 0
+          # else:
+          #   self.subdom_constant = self.get_subdom_constant()
           
           # for k in range(self.num_of_features):
           #   sample_loss = self.sample_loss[j, k]
@@ -1074,6 +1059,7 @@ class Super_human:
         self.logi_params = self.base_dict["logi_params"]
     except Exception:
       self.base_model()
+  
   def read_nn_model(self):
     experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
     file_dir = os.path.join(self.train_data_path)
@@ -1141,8 +1127,8 @@ if __name__ == "__main__":
   
   if args['task'] == 'prepare-demos':
     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
-    sh_obj.base_model()
     sh_obj.prepare_test_pp(model = model, alpha = alpha, beta = beta) # this alpha is different from self.alpha
+    sh_obj.base_model()
 
   elif args['task'] == 'train':
     print("lr_theta: ", lr_theta)
@@ -1155,9 +1141,9 @@ if __name__ == "__main__":
 
   elif args['task'] == 'test':
     sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
-    #sh_obj.base_model()
-    # sh_obj.read_model_from_file()
-    sh_obj.read_nn_model()
+    # sh_obj.base_model()
+    sh_obj.read_model_from_file()
+    # sh_obj.read_nn_model()
     sh_obj.test_model(-1)
   
   elif args['task'] == 'noise-test':

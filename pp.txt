@@ -1,0 +1,116 @@
+['inacc', 'dp', 'eqodds', 'prp']
+self.label:  label
+root:  experiments
+len(model_params):  1
+[{'model': LogisticRegression_pytorch(
+  (linear): Linear(in_features=109, out_features=1, bias=True)
+  (sigmoid): Sigmoid()
+), 'theta': array([-0.1647326 ,  0.19447498,  0.02786265,  2.6565993 , -0.17919052,
+       -0.08841672, -1.1961097 , -0.40777573, -1.032095  , -0.28020626,
+       -0.64237684, -0.06071319, -0.91056734, -0.83219117, -0.9426661 ,
+       -0.62744224, -0.39638847, -1.2537092 , -1.0416268 , -4.0816326 ,
+       -1.0614704 , -0.9680236 , -0.95483303, -2.7136137 , -0.09041908,
+       -0.6807753 , -1.0646516 , -0.65675795, -0.5981638 , -0.47885713,
+       -0.34567648, -0.72403204, -0.29136205, -0.4179372 ,  0.10742579,
+       -0.45747888, -0.7201434 , -0.7342458 ,  0.51279014, -0.01327338,
+       -1.0926769 , -1.1113691 , -1.0609492 , -0.58853   ,  0.15763007,
+       -0.4770905 ,  0.35415798, -1.431204  , -0.84389365, -0.82474387,
+       -0.8873971 , -1.5127679 , -2.3976636 ,  0.05604939, -0.02679582,
+       -0.24282797,  0.10578699, -0.7964265 , -0.16378936, -0.6364445 ,
+       -1.178265  , -1.0595945 , -0.82657516,  0.91349435,  1.1793059 ,
+       -0.4402552 , -1.2851133 , -2.6399057 , -0.9936043 , -3.271071  ,
+       -0.38465756, -0.7295791 ,  0.02305269,  0.68875015, -0.8786888 ,
+       -0.35336682, -2.0731518 , -0.9480078 , -2.7619467 , -0.4401585 ,
+       -1.9480735 , -0.2533677 , -0.45304993, -2.1825051 , -0.95377564,
+        0.8869213 , -0.93584156, -0.6824323 , -1.3004938 , -1.5970346 ,
+       -0.5750305 , -1.2265396 , -2.826154  , -1.4588308 , -0.77969724,
+       -1.2897781 ,  0.09827179, -1.3794447 , -1.3842939 , -1.3271391 ,
+       -0.39541543, -1.7376881 , -3.1269214 , -0.59443784, -1.6039244 ,
+       -0.26343992, -1.6346754 , -0.19985157, -1.0463387 ], dtype=float32), 'alpha': array([100.        ,  55.99840682,   8.09528047,   6.58840929]), 'eval': [                               Super_human
+ZeroOne                           0.171246
+Demographic parity difference     0.290509
+Equalized odds difference         0.170636
+Predictive value difference       0.054112,                                Super_human
+ZeroOne                           0.155809
+Demographic parity difference     0.253334
+Equalized odds difference         0.160954
+Predictive value difference       0.070288,                                Super_human
+ZeroOne                           0.149994
+Demographic parity difference     0.198549
+Equalized odds difference         0.129236
+Predictive value difference       0.096781,                                Super_human
+ZeroOne                           0.154212
+Demographic parity difference     0.145643
+Equalized odds difference         0.098306
+Predictive value difference       0.122324,                                Super_human
+ZeroOne                           0.173130
+Demographic parity difference     0.093435
+Equalized odds difference         0.064618
+Predictive value difference       0.150670,                                Super_human
+ZeroOne                           0.192048
+Demographic parity difference     0.055768
+Equalized odds difference         0.034476
+Predictive value difference       0.170492,                                Super_human
+ZeroOne                           0.202817
+Demographic parity difference     0.040801
+Equalized odds difference         0.019504
+Predictive value difference       0.179784,                                Super_human
+ZeroOne                           0.207403
+Demographic parity difference     0.033219
+Equalized odds difference         0.007486
+Predictive value difference       0.184066,                                Super_human
+ZeroOne                           0.210065
+Demographic parity difference     0.030033
+Equalized odds difference         0.009062
+Predictive value difference       0.185576,                                Super_human
+ZeroOne                           0.212686
+Demographic parity difference     0.026706
+Equalized odds difference         0.005713
+Predictive value difference       0.187505,                                Super_human
+ZeroOne                           0.215061
+Demographic parity difference     0.025347
+Equalized odds difference         0.012608
+Predictive value difference       0.188073,                                Super_human
+ZeroOne                           0.217722
+Demographic parity difference     0.022812
+Equalized odds difference         0.011820
+Predictive value difference       0.189630,                                Super_human
+ZeroOne                           0.220343
+Demographic parity difference     0.021017
+Equalized odds difference         0.015563
+Predictive value difference       0.190624,                                Super_human
+ZeroOne                           0.222022
+Demographic parity difference     0.019632
+Equalized odds difference         0.015760
+Predictive value difference       0.191504], 'subdom_value': [2.401309533821117, 8.341456900236404, 6.875154367619436, 5.121800951971029, 3.5138746637276945, 1.9568757619103874, 1.0230836305783937, 0.5373496504232148, 0.4428822620924139, 0.36493558193977643, 0.3156917606720222, 0.32820920347818605, 0.3311926401494902, 0.3516460269739257], 'lr_theta': 0.01, 'num_of_demos': 50, 'iters': 30, 'num_of_features': 4, 'demo_baseline': 'pp', 'feature': {0: 'ZeroOne', 1: 'Demographic parity difference', 2: 'Equalized odds difference', 3: 'Predictive value difference'}, 'eval_sh':                                Super_human
+ZeroOne                           0.216330
+Demographic parity difference     0.017783
+Equalized odds difference         0.016732
+Predictive value difference       0.173554, 'eval_pp_dp':                                pp_demographic_parity
+ZeroOne                                     0.220875
+Demographic parity difference               0.052030
+Equalized odds difference                   0.216893
+Predictive value difference                 0.381526, 'eval_pp_eq_odds':                                pp_equalized_odds
+ZeroOne                                 0.218623
+Demographic parity difference           0.119677
+Equalized odds difference               0.010730
+Predictive value difference             0.282339, 'eval_fairll_dp':                                fair_logloss_demographic_parity
+ZeroOne                                               0.274666
+Demographic parity difference                         0.005706
+Equalized odds difference                             0.055813
+Predictive value difference                           0.113270, 'eval_fairll_eqodds':                                fair_logloss_equalized_odds
+ZeroOne                                           0.254076
+Demographic parity difference                     0.152690
+Equalized odds difference                         0.031563
+Predictive value difference                       0.107371, 'eval_fairll_eqopp':                                fair_logloss_equalized_opportunity
+ZeroOne                                                  0.222295
+Demographic parity difference                            0.183769
+Equalized odds difference                                0.161325
+Predictive value difference                              0.099725, 'eval_MFOpt':                                   MFOpt
+ZeroOne                        0.195696
+Demographic parity difference  0.063152
+Equalized odds difference      0.077549
+Predictive value difference    0.209199}]
+file_dir in read_demo_list:  experiments/data
+demo_list file name: 
+demo_list_Adult_pp_50_0-0

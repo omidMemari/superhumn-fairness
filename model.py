@@ -67,7 +67,6 @@ class LogisticRegression_pytorch(nn.Module):
         for epoch in range(max_iter):
             self.optimizer.zero_grad()
             outputs = self(X_train)
-            
             loss = criterion(outputs, Y_train.squeeze().type(torch.LongTensor))
             loss.backward()
             self.optimizer.step()
