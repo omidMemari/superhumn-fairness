@@ -197,8 +197,8 @@ class Super_human:
         random_state=12345,
         stratify=Y
         )
-    self.model_obj = LogisticRegression_pytorch(X_train.shape[1], pd.unique(Y).size)
-    # self.model_obj = LR_base_superhuman_model()
+    # self.model_obj = LogisticRegression_pytorch(X_train.shape[1], pd.unique(Y).size)
+    self.model_obj = LR_base_superhuman_model()
     print("self.model_obj.type: ", self.model_obj.type)
     self.model_obj.fit(X_train, Y_train)
     self.pred_scores = self.model_obj.predict_proba(X_test)
@@ -536,19 +536,23 @@ class Super_human:
     return self.demo_list
 
   def get_model_pred(self, item): # an item is one row of the dataset
-    # print(type(item))
-    item = np.asarray(item, dtype=np.float32)
-    # convert to tensor
-    item = torch.from_numpy(item).cuda()
-    score = self.model_obj(item).squeeze()
+    if isinstance(self.model_obj, LogisticRegression_pytorch):
+      item = np.asarray(item, dtype=np.float32)
+      # convert to tensor
+      item = torch.from_numpy(item).cuda()
+      score = self.model_obj(item).squeeze()
+      return score
+    score = self.model_obj.predict_proba(item).squeeze() # [p(y = 0), p(y = 1)]
     return score
 
   def sample_from_prob(self, dist, size):
-
     preds = [0.0, 1.0]
     dist /= dist.sum()
-    dist_t = dist.cpu().detach().numpy()
-    sample_preds = np.random.choice(preds, size, True, dist_t)
+    if isinstance(self.model_obj, LogisticRegression_pytorch):
+      dist_t = dist.cpu().detach().numpy()
+      sample_preds = np.random.choice(preds, size, True, dist_t)
+      return sample_preds
+    sample_preds = np.random.choice(preds, size, True, dist)
     return sample_preds
 
   def sample_superhuman(self):
@@ -887,10 +891,10 @@ class Super_human:
     print("after it returned")
     for i in tqdm(range(iters)):
       # find sample loss and store it, we will use it for computing grad_theta and grad_alpha
-      # self.sample_superhuman() # update self.sample_matrix with new samples from new theta # sample_matrix
-      
-      # self.get_samples_demo_indexed() # sample_matrix_demo_indexed
-      # self.get_sample_loss() # cost feature fk(xi)
+      if not isinstance(self.model_obj, LogisticRegression_pytorch):
+        self.sample_superhuman() # update self.sample_matrix with new samples from new theta # sample_matrix
+        self.get_samples_demo_indexed() # sample_matrix_demo_indexed
+        self.get_sample_loss() # cost feature fk(xi)
       
       
       alpha = self.get_model_alpha()
