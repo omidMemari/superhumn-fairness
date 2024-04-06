@@ -586,7 +586,8 @@ class Super_human:
     """
     start_time = time.time()
     self.sample_loss = np.zeros((self.num_of_demos, self.num_of_features))
-    self.sample_loss = torch.from_numpy(self.sample_loss).cuda()
+    
+    # self.sample_loss = torch.from_numpy(self.sample_loss).cuda()
     for demo_index, x in enumerate(tqdm(self.demo_list)):
       demo = self.demo_list[demo_index] # get demonstrator
       sample_preds = self.sample_matrix_demo_indexed[demo_index,:]
@@ -606,8 +607,13 @@ class Super_human:
     return demo_loss
 
   def get_subdom_constant(self):
+    if isinstance(self.model_obj, LogisticRegression_pytorch):
+      if self.c == None:
+        subdom_constant = torch.mean(self.subdom_tensor).cuda()
+        return subdom_constant
+      
     if self.c == None:  # only update it in the first iteration with the initial sample values
-      subdom_constant = torch.mean(self.subdom_tensor).cuda()
+      subdom_constant = np.mean(self.subdom_tensor)
     return subdom_constant
 
   def get_subdom_tensor(self):
@@ -670,6 +676,9 @@ class Super_human:
       for j in range(self.num_of_demos):
         sample_loss = self.sample_loss[j, k]
         demo_loss = self.demo_list[j].metric[k] 
+        print("check here")
+        print(type(sample_loss), type(demo_loss))
+        
         sorted_demos.append((demo_loss, sample_loss))
       
       sorted_demos.sort(key = lambda x: x[0]) #dominated_demos.sort(key = lambda x: x[0], reverse=True)   # sort based on demo loss
@@ -858,7 +867,11 @@ class Super_human:
       
     print(self.model_obj)
     print(type(X))
-    scores = self.model_obj(X)[:, 1]
+    if isinstance(self.model_obj, LogisticRegression_pytorch):
+      scores = self.model_obj(X)[:, 1]
+    else:
+      scores = self.model_obj.predict_proba(X)[:, 1]
+    
     print(scores)
     print(np.mean(Y_train))
     # Predictions (0 or 1) on test set
@@ -867,8 +880,13 @@ class Super_human:
     #preds = predict_nn(X, Y_train, A, X, Y_test, A, self)
     # Metrics
     eval = pd.DataFrame(index = [self.feature[i] for i in range(self.num_of_features)]) #['Demographic parity difference', 'False negative rate difference', 'ZeroOne']
-    models_dict = {
-              "Super_human": (preds.cpu().data.numpy(), preds.cpu().data.numpy())}
+    
+    if isinstance(self.model_obj, LogisticRegression_pytorch):
+      models_dict = {
+                "Super_human": (preds.cpu().data.numpy(), preds.cpu().data.numpy())}
+    else:
+      models_dict = {
+              "Super_human": (preds, preds)}
     eval = get_metrics_df(models_dict = models_dict, y_true = Y_test, group = A_str, feature = feature, is_demo = False)
     return eval
 
