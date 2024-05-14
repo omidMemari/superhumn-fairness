@@ -1,5 +1,0 @@
-tensor(457.8993, device='cuda:0', grad_fn=<SumBackward0>)
-tensor(453.1754, device='cuda:0', grad_fn=<SumBackward0>)
-tensor(460.3856, device='cuda:0', grad_fn=<SumBackward0>)
-tensor(460.9461, device='cuda:0', grad_fn=<SumBackward0>)
-tensor(458.4833, device='cuda:0', grad_fn=<SumBackward0>)

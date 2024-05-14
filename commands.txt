@@ -12,3 +12,8 @@ python main.py -t [test|noise-test] -n [True|False] -d [Adult|COMPAS] -f inacc d
 python3 main.py -t prepare-demos  -n False -d Adult -f inacc dp eqodds prp
 python main.py -t train -n False -d Adult -f inacc dp eqodds prp
 python main.py -t test -n False -d Adult -f inacc dp eqodds prp
+
+python plot.py -t test -n False -d Adult -f inacc dp eqodds prp
+
+
+reminder it is now in cuda
