@@ -39,14 +39,15 @@ class base_superhuman_model:
 class LogisticRegression_pytorch(nn.Module):
     def __init__(self, n_inputs, n_outputs):
         super(LogisticRegression_pytorch, self).__init__()
+        
         self.linear = nn.Linear(n_inputs, n_outputs)
         self.sigmoid = nn.Sigmoid()
         self.softmax = nn.Softmax(dim = 1)
         self.type = 'LR_pytorch'
-        self.fc1 = nn.Linear(n_inputs, 64)
+        self.fc1 = nn.Linear(n_inputs, 128)
         self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(int(64), 32)
-        self.fc3 = nn.Linear(32, 2)
+        self.fc2 = nn.Linear(int(128), 64)
+        self.fc3 = nn.Linear(64, 2)
         self.out = nn.Softmax(dim=1)
         self.dropout1 = nn.Dropout(0.2)
         self.dropout2 = nn.Dropout(0.2)      

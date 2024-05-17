@@ -4,14 +4,28 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import argparse
 import numpy as np
-from main import Super_human, default_args
+from data_util import read_demo_list
+from optimize import Super_human, default_args
 from util import create_features_dict, make_experiment_filename, load_object, find_gamma_superhuman, find_gamma_superhuman_all
-
+import json
 
 baselines = {'eval_sh', 'eval_pp_dp', 'eval_pp_eq_odds', 'eval_fairll_dp', 'eval_fairll_eqodds', 'eval_MFOpt'}
 marker = {'eval_sh':'P', 'eval_pp_dp':'o', 'eval_pp_eq_odds':'o', 'eval_fairll_dp':'P', 'eval_fairll_eqodds':'P', 'eval_MFOpt':'h'}
 color = {'eval_sh':'k', 'eval_pp_dp':'b', 'eval_pp_eq_odds':'g', 'eval_fairll_dp':'darkcyan', 'eval_fairll_eqodds':'indigo', 'eval_MFOpt':'m'}
 label = {'eval_sh':'superhuman_test', 'eval_pp_dp':'post_proc_dp', 'eval_pp_eq_odds':'post_proc_eqodds', 'eval_fairll_dp':'fair_logloss_dp', 'eval_fairll_eqodds':'fair_logloss_eqodds', 'eval_MFOpt':'MFOpt'}
+
+protected_map = {
+    'Adult': {2: "Female", 1: "Male"},
+    'COMPAS': {1: 'Caucasian', 0: 'African-American'},
+    'Diabetes': {2: "Female", 1: "Male"},
+    'acs_west_poverty': {0: 'White', 1: 'Black'},
+    'acs_west_mobility': {0: 'White', 1: 'Black'},
+    'acs_west_income': {0: 'White', 1: 'Black'},
+    'acs_west_insurance': {0: 'White', 1: 'Black'},
+    'acs_west_public': {0: 'White', 1: 'Black'},
+    'acs_west_travel': {0: 'White', 1: 'Black'},
+    'acs_west_employment': {0: 'White', 1: 'Black'}
+}
 
 name = {"ZeroOne": "Prediction error", "Demographic parity difference": "D.DP", "Equalized odds difference": "D.EqOdds", "Predictive value difference": "D.PRP", "False negative rate difference": "D.FNR",  "False positive rate difference": "D.FPR", "Positive predictive value difference": "D.PPV", "Negative predictive value difference": "D.NPV", "Overall AUC": "AUC", "AUC difference": "D.AUC", "Balanced error rate difference": "D.Balanced Error Rate"}
 short = {"ZeroOne": "error", "Demographic parity difference": "DP", "D.FNR": "FNR", "D.FPR": "FPR", "Equalized odds difference": "EqOdds", "D.PPV": "PPV", "D.NPV":"NPV", "Predictive value difference":"PRP", "Balanced error rate difference": "D.ErrorRate", "Positive predictive value difference": "PPV", "Negative predictive value difference": "NPV", "Overall AUC": "AUC", "AUC difference": "D.AUC"}
@@ -25,8 +39,8 @@ noise_list = [0.0, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08]#, 0.09, 0.10]
 def plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type, model_params, sh_obj):
 
     #sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
-
-    demo_list = sh_obj.read_demo_list()
+    # read_demo_list(data_path = self.data_path, dataset = self.dataset, demo_baseline = self.demo_baseline, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
+    demo_list = read_demo_list(data_path = sh_obj.data_path, dataset = dataset, demo_baseline = demo_baseline, num_of_demos = num_of_demos, noise_ratio = noise_ratio)
     model_params = model_params[0]
     alpha = model_params["alpha"]
     print("alpha: ", alpha)
@@ -253,7 +267,10 @@ def plot_noise_test(dataset, feature, num_of_features, demo_baseline, base_model
 
 
 
-
+def parse_args(f):
+    with open(f, 'r') as f:
+        args = json.load(f)
+    return args
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Description of your program')
@@ -263,22 +280,52 @@ if __name__ == "__main__":
     parser.add_argument('-b','--demo_baseline', help='model for creating demos', default = default_args['demo_baseline'])
     parser.add_argument('-f', '--features', help="features list", nargs='+', default = default_args['features'])
     parser.add_argument('-m', '--base_model_type', help="model type", default = default_args['base_model_type'])
-    args = vars(parser.parse_args())
-    dataset = args['dataset']
-    noise = eval(args['noise'])
-    demo_baseline = args['demo_baseline']
-    feature_list = args['features']
-    base_model_type = args['base_model_type']
+    
+    parser = argparse.ArgumentParser("Super Human Fairness")
+    parser.add_argument("-c","--config", help="Specify the config file")
+    args = parser.parse_args()
+    conf = parse_args(args.config)
+    # parameters
+    dataset = conf['dataset']
+    feature_list = conf['features']
+    demo_baseline = conf['demo_baseline']
+    base_model_type = conf['base_model_type']
+    noise = conf['noise']
+    num_of_demos = conf['num_of_demos']
+    lr_theta = conf['lr_theta']
+    noise_ratio = conf['noise_ratio']
+    iters = conf['iters']
+    alpha = conf['alpha']
+    beta = conf['beta']
+    task = conf['task']
+    model = conf['model']
+    sensitive_attribute = conf['sensitive_attribute']
+    label = conf['label']
+    model_obj = conf['model_obj']
+    
+    dict_map = protected_map[dataset]
+    
+    if noise==False:
+        root = "experiments"
+    else:
+        root = "experiments/noise"
+        
+    data_path = os.path.join(root, "data")
+    model_path = os.path.join(root, "model")
+    train_data_path = os.path.join(root, "train")
+    test_data_path = os.path.join(root, "test")
+    plots_path = os.path.join(root, "plots")
+    dataset_path = os.path.join("dataset", dataset, "dataset_ref.csv")
+    
     feature, num_of_features = create_features_dict(feature_list)
-    print(feature_list)
 
-    if args['task'] == 'test':
+    if task == 'test':
         # experiment_filename = make_experiment_filename(dataset = dataset, demo_baseline= demo_baseline, lr_theta = lr_theta, num_of_demos = num_of_demos, noise_ratio = noise_ratio)
         # file_dir = os.path.join(sh_obj.test_data_path)
         # model_params = load_object(file_dir,experiment_filename, -1)
         # plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type, model_params)
         if noise==False: noise_ratio = 0.0
-        sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
+        sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type, model_obj="omid")
         print("See plot path here: ",sh_obj.plots_path)
         experiment_filename = make_experiment_filename(dataset = dataset, demo_baseline= demo_baseline, lr_theta = lr_theta, num_of_demos = num_of_demos, noise_ratio = noise_ratio)
         file_dir = os.path.join(sh_obj.test_data_path)
@@ -287,7 +334,7 @@ if __name__ == "__main__":
         print(model_params)
         plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type, model_params, sh_obj)
 
-    elif args['task'] == 'test-errorbars':
+    elif task == 'test-errorbars':
         if noise==False: noise_ratio = 0.0
         exp_idx = 4   # plots the training parameters of the #th experiment
         sh_obj = Super_human(dataset = dataset, num_of_demos = num_of_demos, feature = feature, num_of_features = num_of_features, lr_theta = lr_theta, noise = noise, noise_ratio = noise_ratio, demo_baseline= demo_baseline, base_model_type = base_model_type)
@@ -299,7 +346,7 @@ if __name__ == "__main__":
         plot_features_errorbars(noise, dataset, noise_ratio, feature, num_of_features, demo_baseline, base_model_type, model_params, sh_obj, exp_idx)
         
 
-    elif args['task'] == 'noise-test':
+    elif task == 'noise-test':
         plot_noise_test(dataset, feature, num_of_features, demo_baseline, base_model_type)
 
 

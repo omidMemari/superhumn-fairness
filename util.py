@@ -12,6 +12,7 @@ from fairlearn.metrics import (
     equalized_odds_difference)
 from sklearn.metrics import balanced_accuracy_score, roc_auc_score, zero_one_loss
 
+default_args = {'dataset': 'Adult', 'iters': 50, 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc', 'dp', 'eqodds', 'prp'], 'base_model_type': 'LR', 'num_experiment': 10}
 sample_record_filename_template = "{}_{}_{}_{}_{}"
 
 feature_expand_dict = {'inacc': "ZeroOne", 'dp': "Demographic parity difference", 'eqodds': "Equalized odds difference", 'prp': "Predictive value difference", 'eqopp': "False negative rate difference",  'fnr': "False negative rate difference", 'fpr': "False positive rate difference", 'ppv': "Positive predictive value difference", 'npv': "Negative predictive value difference", 'auc': "Overall AUC", 'auc_diff': "AUC difference", 'error_rate_diff': "Balanced error rate difference"}
@@ -40,7 +41,7 @@ def store_object(obj, path, name, exp_idx):
     if not os.path.exists(path):
         os.makedirs(path)
     filepath = os.path.join(path,name)
-    from main import default_args
+    
     if exp_idx == -1 or exp_idx == 0:
         with open(filepath, 'wb') as file:
             pickle.dump(obj,file)
