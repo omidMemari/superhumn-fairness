@@ -7,7 +7,7 @@
     "label": "label",
     "alpha": 0.5,
     "beta": 0.5,
-    "iters": 50,
+    "iters": 24,
     "num_of_demos": 50,
     "num_of_features": 4,
     "lr_theta": 0.01,

@@ -2,6 +2,7 @@ import os
 import time
 import pickle
 import copy
+import logging
 
 # Data Manipulation and Visualization
 import numpy as np
@@ -25,6 +26,10 @@ from data_demo import data_demo
 # Progress Bar
 from tqdm import tqdm
 
+import functools
+print = functools.partial(print, flush=True)
+
+torch.cuda.set_device(1)
 default_args = {'dataset': 'Adult', 'iters': 50, 'num_of_demos': 50, 'num_of_features': 4, 'lr_theta': 0.01, 'noise': 'False', 'noise_ratio': 0.2, 'demo_baseline': 'pp', 'features': ['inacc', 'dp', 'eqodds', 'prp'], 'base_model_type': 'LR', 'num_experiment': 10}
 label_dict = {'Adult': 'label', 'COMPAS':'two_year_recid', 'Diabetes': 'label', 'acs_west_poverty': 'POVPIP', 'acs_west_mobility': 'MIG', 'acs_west_income': 'PINCP', 'acs_west_insurance': 'HINS2', 'acs_west_public': 'PUBCOV', 'acs_west_travel': 'JWMNP', 'acs_west_employment': 'ESR'}
 protected_dict = {'Adult': 'gender', 'COMPAS':'race',  'Diabetes': 'gender', 'acs_west_poverty': 'RAC1P', 'acs_west_mobility': 'RAC1P', 'acs_west_income': 'RAC1P', 'acs_west_insurance': 'RAC1P', 'acs_west_public': 'RAC1P', 'acs_west_travel': 'RAC1P', 'acs_west_employment': 'RAC1P'}
@@ -45,6 +50,8 @@ lamda = 0.001
 model = "logistic_regression"
 noise_list = [0.2]
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class Super_human:
 
@@ -109,10 +116,23 @@ class Super_human:
       return subdom_tensor_sum
   
   def base_model(self):
-    self.model_name = "LR_pytorch"
+    self.model_name = self.base_model_type
     train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
     self.train_data = pd.read_csv(train_file_path, index_col=0)
+    
+    # posA, negA, posB, negB, automate
+    new_columns = pd.DataFrame({
+    'posA': [0] * len(self.train_data),
+    'negA': [0] * len(self.train_data),
+    'posB': [0] * len(self.train_data),
+    'negB': [0] * len(self.train_data)
+    }, index=self.train_data.index)
+    sensitive_col_index = self.train_data.columns.get_loc(self.sensitive_feature)
+    
+    train_data_prev = self.train_data.iloc[:, :sensitive_col_index]
+    train_data_next = self.train_data.iloc[:, sensitive_col_index:]
+    self.train_data = pd.concat([train_data_prev, new_columns, train_data_next], axis=1)
 
     A = self.train_data[self.sensitive_feature]
     A_str = A.map(self.dict_map)
@@ -130,21 +150,21 @@ class Super_human:
         stratify=Y
     )
 
+    
     if self.model_obj == 'omid':
       self.model_obj = LR_base_superhuman_model()
     elif self.model_obj == 'nn':
       self.model_obj = LogisticRegression_pytorch(X_train.shape[1], pd.unique(Y).size).cuda()
-      
+      self.model_name = self.base_model_type + str(self.model_obj.n_nodes)
+
       
     print("self.model_obj.type: ", self.model_obj.type)
-    # X_train = torch.from_numpy(X_train.to_numpy(dtype=np.float32)).cuda()
-    # Y_train = torch.from_numpy(Y_train.to_numpy(dtype=np.float32)).cuda()
-    # X_test = torch.from_numpy(X_test.to_numpy(dtype=np.float32)).cuda()
-    # Y_test = torch.from_numpy(Y_test.to_numpy(dtype=np.float32)).cuda()
-    
-    self.model_obj.fit(X_train, Y_train)
-    self.pred_scores = self.model_obj.predict_proba(X_test)
 
+    self.model_obj.fit(X_train, Y_train)
+    
+    self.pred_scores = self.model_obj.predict_proba(X_test)
+    
+    
     if self.dataset == 'COMPAS':
       mode = 'demographic_parity' #'equalized_opportunity' # #'equalized_odds'
       C = .005
@@ -190,8 +210,11 @@ class Super_human:
                  "Y_test": Y_test,
                  "A_str_train": A_str_train,
                  "A_str_test": A_str_test}
-    print(self.dataset)
+    
+    
     model_file_dir = os.path.join(self.model_path, 'base_model_' + self.dataset + '.pickle') 
+    if os.path.exists(self.model_path) == False:
+      os.makedirs(self.model_path)
     with open(model_file_dir, 'wb') as handle:
         pickle.dump(self.base_dict, handle)
     
@@ -265,16 +288,26 @@ class Super_human:
       item = np.asarray(item, dtype=np.float32)
       # convert to tensor
       item = torch.from_numpy(item)
-      score = self.model_obj(item.cuda()).squeeze()
+      score = self.model_obj(item.cuda())
       return score
     score = self.model_obj.predict_proba(item).squeeze() # [p(y = 0), p(y = 1)]
     return score
 
+  # def sample_from_prob(self, dist, size):
+  #   preds = [0.0, 1.0]
+  #   dist /= dist.sum()
+  #   if isinstance(self.model_obj, LogisticRegression_pytorch):
+  #     dist_t = dist.cpu().detach().numpy() # original contains no squeeze
+  #     sample_preds = np.random.choice(preds, size, True, dist_t)
+  #     return sample_preds
+  #   sample_preds = np.random.choice(preds, size, True, dist)
+  #   return sample_preds
+  
   def sample_from_prob(self, dist, size):
     preds = [0.0, 1.0]
     dist /= dist.sum()
     if isinstance(self.model_obj, LogisticRegression_pytorch):
-      dist_t = dist.cpu().detach().numpy()
+      dist_t = dist.cpu().detach().numpy().squeeze()
       sample_preds = np.random.choice(preds, size, True, dist_t)
       return sample_preds
     sample_preds = np.random.choice(preds, size, True, dist)
@@ -286,12 +319,25 @@ class Super_human:
     train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
     print(train_file_path)
+    
     self.train_data = pd.read_csv(train_file_path, index_col=0)
+    new_columns = pd.DataFrame({
+    'posA': [0] * len(self.train_data),
+    'negA': [0] * len(self.train_data),
+    'posB': [0] * len(self.train_data),
+    'negB': [0] * len(self.train_data)
+    }, index=self.train_data.index)
+    sensitive_col_index = self.train_data.columns.get_loc(self.sensitive_feature)
+    
+    train_data_prev = self.train_data.iloc[:, :sensitive_col_index]
+    train_data_next = self.train_data.iloc[:, sensitive_col_index:]
+    self.train_data = pd.concat([train_data_prev, new_columns, train_data_next], axis=1)
+    
     X = self.train_data.drop(columns=[self.label]).to_numpy(dtype=np.float32)
     data_size, feature_size = self.train_data.shape
     self.sample_matrix = np.zeros((self.num_of_demos, data_size)) #np.array([[-1 for _ in range(data_size)] for _ in range(num_of_samples)]) # create a matrix of size [num_of_samples * data_set_size]. Each row is a sample from our model that predicts the self.label of dataset.
+    print(X.shape)
     for j in range(data_size):
-      # print("check X[j] here", type(X[j]))
       probs = self.get_model_pred(item = [X[j]] )
       self.sample_matrix[:,j] = self.sample_from_prob(dist = probs, size = self.num_of_demos) # return a vector of size num_of_samples (50) with self.label prediction samples for j_th item of the dataset
     print("--- %s end of sample_superhuman ---" % (time.time() - start_time))
@@ -392,14 +438,12 @@ class Super_human:
   def compute_alpha(self, demo_list):
     start_time = time.time()
     alpha = np.ones(self.num_of_features)
-  
     for k in range(self.num_of_features):
       sorted_demos = []
       alpha_candidate = []
       for j in range(self.num_of_demos):
         sample_loss = self.sample_loss[j, k]
         demo_loss = demo_list[j].metric[k] 
-
         sorted_demos.append((demo_loss, sample_loss))
       
       sorted_demos.sort(key = lambda x: x[0]) #dominated_demos.sort(key = lambda x: x[0], reverse=True)   # sort based on demo loss
@@ -429,9 +473,35 @@ class Super_human:
     train_file_path = os.path.join(self.train_data_path, train_data_filename)
     test_data_filename = "test_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
     test_file_path = os.path.join(self.test_data_path, test_data_filename)
-
+    
     self.train_data = pd.read_csv(train_file_path, index_col=0)
     self.test_data = pd.read_csv(test_file_path, index_col=0)
+    
+    new_columns = pd.DataFrame({
+    'posA': [0] * len(self.train_data),
+    'negA': [0] * len(self.train_data),
+    'posB': [0] * len(self.train_data),
+    'negB': [0] * len(self.train_data)
+    }, index=self.train_data.index)
+    sensitive_col_index = self.train_data.columns.get_loc(self.sensitive_feature)
+    
+    train_data_prev = self.train_data.iloc[:, :sensitive_col_index]
+    train_data_next = self.train_data.iloc[:, sensitive_col_index:]
+    self.train_data = pd.concat([train_data_prev, new_columns, train_data_next], axis=1)
+    
+    # do the same for test data
+    new_columns = pd.DataFrame({
+    'posA': [0] * len(self.test_data),
+    'negA': [0] * len(self.test_data),
+    'posB': [0] * len(self.test_data),
+    'negB': [0] * len(self.test_data)
+    }, index=self.test_data.index)
+    sensitive_col_index = self.test_data.columns.get_loc(self.sensitive_feature)
+    
+    test_data_prev = self.test_data.iloc[:, :sensitive_col_index]
+    test_data_next = self.test_data.iloc[:, sensitive_col_index:]
+    self.test_data = pd.concat([test_data_prev, new_columns, test_data_next], axis=1)
+    
     A_train = self.train_data[self.sensitive_feature]
     A_test = self.test_data[self.sensitive_feature]
     A_str_train = A_train.map(self.dict_map)
@@ -554,6 +624,19 @@ class Super_human:
       train_file_path = os.path.join(self.train_data_path, train_data_filename)
 
       self.train_data = pd.read_csv(train_file_path, index_col=0)
+      
+      new_columns = pd.DataFrame({
+      'posA': [0] * len(self.train_data),
+      'negA': [0] * len(self.train_data),
+      'posB': [0] * len(self.train_data),
+      'negB': [0] * len(self.train_data)
+      }, index=self.train_data.index)
+      sensitive_col_index = self.train_data.columns.get_loc(self.sensitive_feature)
+      
+      train_data_prev = self.train_data.iloc[:, :sensitive_col_index]
+      train_data_next = self.train_data.iloc[:, sensitive_col_index:]
+      self.train_data = pd.concat([train_data_prev, new_columns, train_data_next], axis=1)
+      
       A = self.train_data[self.sensitive_feature]
       A_str = A.map(self.dict_map)
       # Extract the target
@@ -566,11 +649,38 @@ class Super_human:
       train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
       train_file_path = os.path.join(self.train_data_path, train_data_filename)
       self.train_data = pd.read_csv(train_file_path, index_col=0)
+      
+      new_columns = pd.DataFrame({
+      'posA': [0] * len(self.train_data),
+      'negA': [0] * len(self.train_data),
+      'posB': [0] * len(self.train_data),
+      'negB': [0] * len(self.train_data)
+      }, index=self.train_data.index)
+      sensitive_col_index = self.train_data.columns.get_loc(self.sensitive_feature)
+      
+      train_data_prev = self.train_data.iloc[:, :sensitive_col_index]
+      train_data_next = self.train_data.iloc[:, sensitive_col_index:]
+      self.train_data = pd.concat([train_data_prev, new_columns, train_data_next], axis=1)
+      
       Y_train = self.train_data[self.label]
       ## read test data
       test_data_filename = "test_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
       test_file_path = os.path.join(self.test_data_path, test_data_filename)
       self.test_data = pd.read_csv(test_file_path, index_col=0)
+      
+      new_columns = pd.DataFrame({
+        'posA': [0] * len(self.test_data),
+        'negA': [0] * len(self.test_data),
+        'posB': [0] * len(self.test_data),
+        'negB': [0] * len(self.test_data)
+        }, index=self.test_data.index)
+      sensitive_col_index = self.test_data.columns.get_loc(self.sensitive_feature)
+      
+      test_data_prev = self.test_data.iloc[:, :sensitive_col_index]
+      test_data_next = self.test_data.iloc[:, sensitive_col_index:]
+      self.test_data = pd.concat([test_data_prev, new_columns, test_data_next], axis=1)
+      
+      
       A = self.test_data[self.sensitive_feature]
       A_str = A.map(self.dict_map)
       Y_test = self.test_data[self.label]
@@ -614,62 +724,81 @@ class Super_human:
   def update_model_alpha(self, new_alpha):
     self.alpha = new_alpha
   
+  
+
   def update_model(self, lr_theta, iters):
+    max_gamma = -1
+    triggered = 0
+    triggered_performance = 0
+    test_trigger = 0
+    times_not_improved = 0
     self.lr_theta = lr_theta
     self.grad_theta, subdom_tensor_sum_arr, self.eval, self.gamma_superhuman_arr = [], [], [], []
+    # print("self.train_data: ", self.train_data.head())
     Y = self.train_data[self.label]
     X = self.train_data.drop(columns=[self.label])
     X = torch.tensor(X.values, dtype=torch.float32)
     
-    print(Y)
-    print("self.base_model_type: ", self.model_obj.type)
+    # print(Y)
+    print("self.base_model_type: ", self.model_obj.type, flush=True)
     gamma_degrade = 0
-    print("after it returned")
+    print("after it returned", flush=True)
     demo_list = read_demo_list(data_path = self.data_path, dataset = self.dataset, demo_baseline = self.demo_baseline, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
+    
+    best_params = None
     for i in tqdm(range(iters)):
-      # find sample loss and store it, we will use it for computing grad_theta and grad_alpha
-      # if not isinstance(self.model_obj, LogisticRegression_pytorch):
+      Y = self.train_data[self.label]
+      X = self.train_data.drop(columns=[self.label])
       self.sample_superhuman() # update self.sample_matrix with new samples from new theta # sample_matrix
       self.get_samples_demo_indexed(demo_list) # sample_matrix_demo_indexed
       self.get_sample_loss(demo_list) # cost feature fk(xi)
-      
-      
+      # for g in self.model_obj.optimizer.param_groups:
+        # g['lr'] = 0.0001
+      print("iteration: ", i, flush=True)
       alpha = self.alpha
       if isinstance(self.model_obj, LogisticRegression_pytorch):
-        print("model is LogisticRegression_pytorch")
-        # get the current theta and alpha
-        # theta = self.model_obj.get_model_theta()
-        # print(len(theta))
-        # find new theta
-        # subdom_tensor_sum, grad_theta = self.compute_grad_theta() # computer gradient of loss w.r.t theta by sampling from our model
-
-        # new_theta = theta - self.lr_theta * grad_theta  # update theta using the gradinet values
-        
-        # 1. compute sample_loss (sample loss contains f vectors)
-        
-        # with torch.no_grad():
-        
-        # pred = self.model_obj(X)
-        # 2. compute subdom_tensor
-        
-        # pred = self.model_obj(X)
-        # get the positive pred values
-        # preds = pred[:, 1]
+        print(f"model is {self.base_model_type}", flush=True)
         self.model_obj.optimizer.zero_grad()
         self.subdom_tensor = np.zeros((self.num_of_demos, self.num_of_features))
         self.predss = []
         temp_subdom_sum = 0
         subdom_tensor_sum = 0
         loss = 0
-        for j, x in enumerate(tqdm(demo_list)):
+        posA, negA, posB, negB = 0, 0, 0, 0
+        
+        """
+        demo_idxs_shuffled = np.random.shuffle(np.arange(len(demo_list))
+        for j in enumerate(tqdm(demo_idxs_shuffled)):
+          x = demo_list[j]
+        """
+        demo_idxs_shuffled = np.random.permutation(len(demo_list))
+        for j in tqdm(demo_idxs_shuffled):
+          x = demo_list[j]
+        # for j, x in enumerate(tqdm(demo_list)):
+          X = self.train_data.drop(columns=[self.label])
+          X['posA'] = posA
+          X['negA'] = negA
+          X['posB'] = posB
+          X['negB'] = negB
+          X = torch.tensor(X.values, dtype=torch.float32)
           X_test = X[x.idx_test.to_numpy(),:]
-          
           if j == 0:
             self.subdom_constant = 0
           else:
             self.subdom_constant = self.get_subdom_constant(self.subdom_tensor)
-          pred = self.model_obj(X_test.cuda())
-          preds = pred[:, 1]
+          
+          preds = self.model_obj(X_test.cuda())
+          dist = torch.distributions.Categorical(preds)
+          yts = dist.sample()
+          Ats = X_test[:, -1].cuda()
+          
+          posA += torch.sum((Ats == 1) & (yts == 1)).item()
+          negA += torch.sum((Ats == 1) & (yts == 0)).item()
+          posB += torch.sum((Ats == 2) & (yts == 1)).item()
+          negB += torch.sum((Ats == 2) & (yts == 0)).item()
+          
+          preds = preds[:, 1]
+          
           for k in range(self.num_of_features):
             sample_loss = self.sample_loss[j, k]
             demo_loss = demo_list[j].metric[k]
@@ -678,80 +807,14 @@ class Super_human:
             temp_subdom_sum = torch.sum(torch.tensor(self.subdom_tensor[j, k], dtype=torch.float32))
             loss += torch.sum(preds) * temp_subdom_sum / len(demo_list)
             subdom_tensor_sum += temp_subdom_sum
-          # print(pred)
-          # exit()
-          # self.preds.append(pred)
-        # subdom_tensor_sum = np.sum(self.subdom_tensor) / len(self.demo_list)
-        # convert subdom_tensor_sum to tensor
-        # self.subdom_tensor = torch.tensor(self.subdom_tensor, dtype=torch.float32)
-        # 3. compute loss
-        # loss = torch.sum(torch.sum(self.predss) * self.subdom_tensor)
         loss.backward()
+
         self.model_obj.optimizer.step()
-  
-        # self.model_obj.optimizer.zero_grad()
-        # # loss = multiply(prob(y_hat given Xi)) * subdom_tensor
-        # self.subdom_tensor = np.zeros((self.num_of_demos, self.num_of_features)) 
-        # self.sample_loss = np.zeros((self.num_of_demos, self.num_of_features))
-        # loss = 0
-        # for j, demo in enumerate(tqdm(self.demo_list)):
-        #   # breakpoint()
-        #   X_test = X[demo.idx_test.to_numpy(),:]
-        #   pred = self.model_obj(X_test)
-        #   y_hat_probs, _ = torch.max(pred, dim=1)
-        #   with torch.no_grad():
-        #     y_hat = torch.argmax(pred,dim=1).cpu().detach().numpy()
-        #   models_dict = {"Super_human": (y_hat, y_hat) }
-        #   y = self.train_data.loc[demo.idx_test][self.label] # we use true_y
-        #   A = self.train_data.loc[demo.idx_test][self.sensitive_feature]
-        #   A_str = A.map(self.dict_map)
-        #   try:
-        #     metric_df = get_metrics_df(models_dict = models_dict, y_true = y, group = A_str,\
-        #     feature = self. feature, is_demo = False)
-        #   except:
-        #     import ipdb; ipdb.set_trace()
-        #   f_hat = []
-        #   f_tilde = []
-        #   #f_demo vector
-        #   for feature_index in range(self.num_of_features):
-        #     f_hat.append(metric_df.loc[self.feature[feature_index]]["Super_human"])
-        #     f_tilde.append(demo.metric[feature_index])
-        #   f_hat = np. asarray(f_hat)
-        #   self.sample_loss [j, :] = f_hat # update sample loss matrix
-        #   f_tilde = np.asarray(f_tilde)
-        #   subdom = np.maximum(np.zeros(self.num_of_features), alpha*(f_hat - f_tilde) + beta).sum()
-        #   # (1, )
-        #   log_prob_sum = torch.log(y_hat_probs).sum()
-        #   loss += log_prob_sum * subdom
-          
-          # if j == 0:
-          #   self.subdom_constant = 0
-          # else:
-          #   self.subdom_constant = self.get_subdom_constant()
-          
-          # for k in range(self.num_of_features):
-          #   sample_loss = self.sample_loss[j, k]
-          #   demo_loss = self.demo_list[j].metric[k]
-          #   self.subdom_tensor[j, k] = max(alpha[k]*(sample_loss - demo_loss) + 1, 0) - self.subdom_constant
-            
-        # subdom_tensor_sum = np.sum(self.subdom_tensor) / len(self.demo_list)
-        # convert subdom_tensor_sum to tensor
-        # self.subdom_tensor = torch.tensor(self.subdom_tensor, dtype=torch.float32)
-        
-        # breakpoint()
-        # loss = torch.sum(torch.sum(pred, dim=0) * self.subdom_tensor)
-        # loss.backward()
-        # self.model_obj.optimizer.step()
-        # subdom_tensor_sum = loss.detach().cpu().item()
-        # find new alpha
         if i == 0:
-          print("eval from first sample: ")
-          print(self.eval_model(mode = "train"))
+          print("\n eval from first sample: ", flush=True)
+          print("\n",self.eval_model(mode = "train"), flush=True)
         new_alpha = self.compute_alpha(demo_list)
-        #update theta
-        # self.model_obj.update_model_theta(new_theta)
-        # self.grad_theta.append(grad_theta)
-        #update alpha
+        
       elif isinstance(self.model_obj, LR_base_superhuman_model):
         print("model is LR_base")
         # get the current theta and alpha
@@ -769,23 +832,69 @@ class Super_human:
         #update theta
         self.model_obj.update_model_theta(new_theta)
         self.grad_theta.append(grad_theta)
-
+        
       self.update_model_alpha(new_alpha)
       # eval model
       eval_i = self.eval_model(mode = "train")
-      print("eval_i:")
+      print("eval_i:", i)
       print(eval_i)
       
-      # store some stuff
+
       subdom_tensor_sum_arr.append(subdom_tensor_sum)
       self.eval.append(eval_i)
-      model_params = {"model":self.model_obj, "theta": self.model_obj.get_model_theta(), "alpha":self.alpha, "eval": self.eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features, "demo_baseline": self.demo_baseline, "feature": self.feature}
+      model_params = {"model":self.model_obj,
+                      "theta": self.model_obj.get_model_theta(),
+                      "alpha":self.alpha,
+                      "eval": self.eval,
+                      "subdom_value": subdom_tensor_sum_arr,
+                      "lr_theta": self.lr_theta,
+                      "num_of_demos":self.num_of_demos,
+                      "iters": iters,
+                      "num_of_features":self.num_of_features,
+                      "demo_baseline": self.demo_baseline,
+                      "feature": self.feature}
       gamma_superhuman = find_gamma_superhuman(demo_list, model_params)
-      self.gamma_superhuman_arr.append(gamma_superhuman)
       
+      self.gamma_superhuman_arr.append(gamma_superhuman)
+
       print("gamma_superhuman: ")
       print(sum(gamma_superhuman))
-      if (sum(self.gamma_superhuman) == self.num_of_features and sum(gamma_superhuman) < self.num_of_features): # if last iter every feature was 1-superhuman and this iter changes --> break
+      
+      if sum(gamma_superhuman) == max_gamma:
+        times_not_improved += 1
+      elif sum(gamma_superhuman) > max_gamma:
+        max_gamma = sum(gamma_superhuman)
+        times_not_improved = 0
+      
+      # if sum(gamma_superhuman) > 3.95 and not triggered:
+      #     for g in self.model_obj.optimizer.param_groups:
+      #       g['lr'] = g['lr'] / 10
+      #     triggered = 1
+      #     print("updated learning rate")
+      #     print(self.model_obj.optimizer.param_groups[0]['lr'])
+      
+      if not triggered:
+        for g in self.model_obj.optimizer.param_groups:
+          g['lr'] = g['lr'] * 10
+        triggered = 1
+      if sum(gamma_superhuman) >= 3.6 and not test_trigger:
+        test_trigger = 1
+        g['lr'] = g['lr'] / 10
+      
+          
+      if sum(gamma_superhuman) >= max_gamma:
+        print("saving best model")
+        print(gamma_superhuman)
+        max_gamma = sum(gamma_superhuman)
+        print("printing out best params so far")
+        best_params = model_params
+        self.model_params = best_params
+        experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
+        file_dir = os.path.join(self.train_data_path)
+        print("saving model")
+        store_object(self.model_params, file_dir, experiment_filename, -1)
+      
+      if (sum(gamma_superhuman) >= self.num_of_features): # if last iter every feature was 1-superhuman and this iter changes --> break
         break
       if len(self.gamma_superhuman_arr) > 10 and sum(gamma_superhuman) < sum(self.gamma_superhuman_arr[-2]):  # look back if it has improved for the last 3 iterations, if not --> break
         gamma_degrade += 1
@@ -793,13 +902,12 @@ class Super_human:
         gamma_degrade = 0
       if gamma_degrade == 3: # peformance degrades for 3 cosecutive iterations.
         break
-      self.model_params = model_params
-
-      
-    #model_params = {"model":self.model_obj, "theta": self.model_obj.coef_, "alpha":self.alpha, "eval": self.eval, "subdom_value": subdom_tensor_sum_arr, "lr_theta": self.lr_theta, "num_of_demos":self.num_of_demos, "iters": iters, "num_of_features": self.num_of_features}
-    experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
-    file_dir = os.path.join(self.train_data_path)
-    store_object(self.model_params, file_dir, experiment_filename, -1)
+    
+    # self.model_params = best_params
+    # experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
+    # file_dir = os.path.join(self.train_data_path)
+    # print("saving model")
+    # store_object(self.model_params, file_dir, experiment_filename, -1)
 
   def read_model_from_file(self):
     experiment_filename = make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio)
@@ -823,6 +931,7 @@ class Super_human:
   def test_model(self, exp_idx):
     eval_sh = self.eval_model(mode = "test-sh")
     print()
+    
     print(eval_sh)
     # eval_model_baseline(self, dataset, noise_ratio, dict_map, baseline="pp", mode="demographic_parity")
     eval_pp_dp = self.eval_model_baseline(self.dataset, self.noise_ratio, self.dict_map, baseline = "pp", mode = "demographic_parity")

@@ -50,16 +50,16 @@ def split_data(alpha=0.5, dataset=None, mode="post-processing", sensitive_featur
 
 def read_demo_list(data_path, dataset, demo_baseline, num_of_demos, noise_ratio):
     file_dir = os.path.join(data_path)
-    print("file_dir in read_demo_list: ", file_dir)
+    print("file_dir in read_demo_list: ", file_dir, flush=True)
     
     demo_list_filename = make_demo_list_filename(dataset=dataset, demo_baseline=demo_baseline, num_of_demos=num_of_demos, noise_ratio=noise_ratio)
-    print("demo_list file name: ")
+    print("demo_list file name: ", flush=True)
     print(demo_list_filename)
     
     demo_list = load_object(file_dir, demo_list_filename, -1)
     
     # print demo_list attributes
-    print("demo_list attributes: ")
+    print("demo_list attributes: ", flush=True)
     print(demo_list[0].__dict__.keys())
     
     return demo_list
@@ -221,6 +221,7 @@ def add_noise_new(data_demo, dataset, noise_ratio, dict_map):  # works fine!
   return data_demo    
 
 def prepare_test_pp(dataset, dataset_path, sensitive_feature, label, feature, num_of_features, dict_map, demo_baseline, lr_theta, num_of_demos, noise_ratio, train_data_path, test_data_path, data_path, noise=False, model="logistic_regression", alpha=0.5, beta=0.5):
+    
     dataset_ref = pd.read_csv(dataset_path, index_col=0) 
     dataset_ref = dataset_ref.copy(deep=True)
     # convert dataset_ref[senitive_feature] to int
@@ -261,6 +262,10 @@ def prepare_test_pp(dataset, dataset_path, sensitive_feature, label, feature, nu
                                                                  lr_theta = lr_theta, num_of_demos = num_of_demos, noise_ratio = noise_ratio) + ".csv"
     test_file_path = os.path.join(test_data_path, test_data_filename)
     
+    if not os.path.exists(train_file_path):
+        os.makedirs(train_data_path)
+    if not os.path.exists(test_file_path):
+        os.makedirs(test_data_path)    
 
     dataset_pp.to_csv(train_file_path)
     dataset_sh.to_csv(test_file_path)

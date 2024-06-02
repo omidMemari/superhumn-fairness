@@ -37,35 +37,41 @@ class base_superhuman_model:
         return np.mean(np.where(Y == 1 , 1 - proba, proba))
 
 class LogisticRegression_pytorch(nn.Module):
-    def __init__(self, n_inputs, n_outputs):
+    # large = 512,
+    # small = 256
+    def __init__(self, n_inputs, n_outputs, n_nodes=512):
         super(LogisticRegression_pytorch, self).__init__()
+        # 4 more inputs, posA negA posB negB
         self.linear = nn.Linear(n_inputs, n_outputs)
         self.sigmoid = nn.Sigmoid()
         self.softmax = nn.Softmax(dim = 1)
-        self.type = 'LR_pytorch'
-        self.fc1 = nn.Linear(n_inputs, 128)
-        self.relu = nn.ReLU()
-        self.fc2 = nn.Linear(int(128), 64)
-        self.fc3 = nn.Linear(64, 2)
+        self.type = 'nn_pytorch'
+        self.n_nodes = n_nodes
+        self.fc1 = nn.Linear(n_inputs, n_nodes)
+        self.relu1 = nn.ReLU()
+        self.relu2 = nn.ReLU()
+        
+        self.fc2 = nn.Linear(int(n_nodes), int(n_nodes/2))
+        self.fc3 = nn.Linear(int(n_nodes/2), 2)
         self.out = nn.Softmax(dim=1)
-        self.dropout1 = nn.Dropout(0.2)
-        self.dropout2 = nn.Dropout(0.2)      
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.0001)
+        # self.dropout1 = nn.Dropout(0.1)
+        # self.dropout2 = nn.Dropout(0.1)      
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.00001)
         
     def forward(self, x):
-        # return self.softmax(self.linear(x))
         x = self.fc1(x)
-        x = self.relu(x)
-        x = self.dropout1(x)
+        x = self.relu1(x)
+        # x = self.dropout1(x)
+        
         x = self.fc2(x)
-        x = self.relu(x)
-        x = self.dropout2(x)
+        x = self.relu2(x)
+        # x = self.dropout2(x)
+        
         x = self.fc3(x)
         x = self.out(x)
         return x
     # defaut max_iter = 1000
-    def fit(self, X_train, Y_train, max_iter = 1000):
-        # weight_decay is l2
+    def fit(self, X_train, Y_train, max_iter = 15000):
         X_train = torch.tensor(X_train.to_numpy(), dtype=torch.float32).cuda()
         Y_train = torch.tensor(Y_train.to_numpy(), dtype=torch.float32).cuda()
         Y_train = Y_train.view(-1, 1)

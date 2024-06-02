@@ -15,7 +15,7 @@
     "noise_ratio": 0.2,
     "demo_baseline": "pp",
     "features": ["inacc", "dp", "eqodds", "prp"],
-    "base_model_type": "LR_pytorch",
+    "base_model_type": "nn_pytorch",
     "num_experiment": 10,
     "model": "logistic regression"
 }
