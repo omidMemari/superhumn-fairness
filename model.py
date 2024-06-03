@@ -39,7 +39,7 @@ class base_superhuman_model:
 class LogisticRegression_pytorch(nn.Module):
     # large = 512,
     # small = 256
-    def __init__(self, n_inputs, n_outputs, n_nodes=512):
+    def __init__(self, n_inputs, n_outputs, n_nodes=128):
         super(LogisticRegression_pytorch, self).__init__()
         # 4 more inputs, posA negA posB negB
         self.linear = nn.Linear(n_inputs, n_outputs)
