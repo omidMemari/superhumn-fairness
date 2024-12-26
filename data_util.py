@@ -135,6 +135,8 @@ def run_demo_baseline(data_demo, demo_baseline, noise, feature, dataset, sensiti
       postprocess_est.fit(X_train_balanced, Y_train_balanced, sensitive_features=A_train_balanced)
       # Post-process preds
       baseline_preds = postprocess_est.predict(X_test, sensitive_features=A_test)
+      print(baseline_preds)
+      exit()
 
     elif demo_baseline == "fair_logloss":
       mode = 'equalized_opportunity' #'equalized_odds'
@@ -286,7 +288,6 @@ def prepare_test_pp(dataset, dataset_path, sensitive_feature, label, feature, nu
         # add_noise_new(self, data_demo, dataset, noise_ratio, dict_map):
         new_demo = add_noise_new(data_demo = new_demo, dataset = dataset, noise_ratio = noise_ratio, dict_map = dict_map)
       print("running metrics")
-      #run_demo_baseline(self, data_demo, demo_baseline, noise, feature, dataset, sensitive_feature, label, noise_ratio):
       metrics = run_demo_baseline(data_demo = new_demo, demo_baseline = demo_baseline, noise = noise,
                                        feature = feature, dataset = dataset, sensitive_feature = sensitive_feature,
                                        label = label, noise_ratio = noise_ratio)

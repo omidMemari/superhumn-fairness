@@ -87,6 +87,9 @@ def find_gamma_superhuman_all(demo_list, model_params):
   for j in range(len(demo_list)):
     count_baseline = np.zeros(len(baseline))
     for i in range(num_of_features):
+        # loop for j from 0 to 50
+        # loop the demo
+        # get the metric of model
       demo_loss = demo_list[j].metric[i] #for z in range(len(demo_list))]
       model_loss = model_params['eval'][-1].loc[feature[i]][0]
       baseline_loss[-1] = model_loss

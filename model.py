@@ -39,7 +39,7 @@ class base_superhuman_model:
 class LogisticRegression_pytorch(nn.Module):
     # large = 512,
     # small = 256
-    def __init__(self, n_inputs, n_outputs, n_nodes=128):
+    def __init__(self, n_inputs, n_outputs, n_nodes=512):
         super(LogisticRegression_pytorch, self).__init__()
         # 4 more inputs, posA negA posB negB
         self.linear = nn.Linear(n_inputs, n_outputs)
@@ -70,6 +70,7 @@ class LogisticRegression_pytorch(nn.Module):
         x = self.fc3(x)
         x = self.out(x)
         return x
+    
     # defaut max_iter = 1000
     def fit(self, X_train, Y_train, max_iter = 15000):
         X_train = torch.tensor(X_train.to_numpy(), dtype=torch.float32).cuda()
@@ -90,6 +91,7 @@ class LogisticRegression_pytorch(nn.Module):
             X = torch.tensor(X, dtype=torch.float32)
         else:
             X = torch.tensor(X.to_numpy(), dtype=torch.float32)
+        # 
         out = torch.cat((1 - self(X.cuda()), self(X.cuda())), 1).detach().cpu().numpy()
         return out
     

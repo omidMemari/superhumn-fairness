@@ -59,8 +59,13 @@ def plot_features(noise, dataset, noise_ratio, feature, num_of_features, demo_ba
             demo_metric_j = [demo_list[z].metric[j] for z in range(len(demo_list))]
             f1 = plt.figure()
             ### our model
+            print(model_params)
             x = model_params['eval'][-1].loc[feature[j]][0]
             y = model_params['eval'][-1].loc[feature[i]][0]
+            # print("\n\n")
+            # print(model_params['eval'][-1])
+            # print(x,y)
+            exit()
             x_test = model_params['eval_sh'].loc[feature[j]][0]
             y_test = model_params['eval_sh'].loc[feature[i]][0]
             ### post-processing

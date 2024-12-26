@@ -122,6 +122,18 @@ class Super_human:
     self.train_data = pd.read_csv(train_file_path, index_col=0)
     
     # posA, negA, posB, negB, automate
+    # new_columns = pd.DataFrame({
+    # 'posA': [0] * len(self.train_data),
+    # 'negA': [0] * len(self.train_data),
+    # 'posB': [0] * len(self.train_data),
+    # 'negB': [0] * len(self.train_data)
+    # }, index=self.train_data.index)
+    # sensitive_col_index = self.train_data.columns.get_loc(self.sensitive_feature)
+    
+    # train_data_prev = self.train_data.iloc[:, :sensitive_col_index]
+    # train_data_next = self.train_data.iloc[:, sensitive_col_index:]
+    # self.train_data = pd.concat([train_data_prev, new_columns, train_data_next], axis=1)
+    
     A = self.train_data[self.sensitive_feature]
     A_str = A.map(self.dict_map)
     
@@ -149,8 +161,14 @@ class Super_human:
     print("self.model_obj.type: ", self.model_obj.type)
 
     self.model_obj.fit(X_train, Y_train)
+    # predict 1 example
     
+    # print(type(X_test))
+    # print(self.model_obj(torch.tensor(X_test.iloc[0].to_numpy(), dtype=torch.float32).cuda()))
     self.pred_scores = self.model_obj.predict_proba(X_test)
+    print("self.pred_scores: \n", self.pred_scores)
+    # print()
+    # exit()
     
     
     if self.dataset == 'COMPAS':
@@ -309,14 +327,31 @@ class Super_human:
     print(train_file_path)
     
     self.train_data = pd.read_csv(train_file_path, index_col=0)
+    
+    # new_columns = pd.DataFrame({
+    # 'posA': [0] * len(self.train_data),
+    # 'negA': [0] * len(self.train_data),
+    # 'posB': [0] * len(self.train_data),
+    # 'negB': [0] * len(self.train_data)
+    # }, index=self.train_data.index)
+    # sensitive_col_index = self.train_data.columns.get_loc(self.sensitive_feature)
+    
+    # train_data_prev = self.train_data.iloc[:, :sensitive_col_index]
+    # train_data_next = self.train_data.iloc[:, sensitive_col_index:]
+    # self.train_data = pd.concat([train_data_prev, new_columns, train_data_next], axis=1)
 
     X = self.train_data.drop(columns=[self.label]).to_numpy(dtype=np.float32)
     data_size, feature_size = self.train_data.shape
     self.sample_matrix = np.zeros((self.num_of_demos, data_size)) #np.array([[-1 for _ in range(data_size)] for _ in range(num_of_samples)]) # create a matrix of size [num_of_samples * data_set_size]. Each row is a sample from our model that predicts the self.label of dataset.
-    print(X.shape)
+    
     for j in range(data_size):
       probs = self.get_model_pred(item = [X[j]] )
+      print(probs)
       self.sample_matrix[:,j] = self.sample_from_prob(dist = probs, size = self.num_of_demos) # return a vector of size num_of_samples (50) with self.label prediction samples for j_th item of the dataset
+      print(self.sample_matrix[:,j].shape)
+      exit()
+      # print(self.sample_matrix[:,j])
+    
     print("--- %s end of sample_superhuman ---" % (time.time() - start_time))
     return self.sample_matrix
 
@@ -454,7 +489,31 @@ class Super_human:
     self.train_data = pd.read_csv(train_file_path, index_col=0)
     self.test_data = pd.read_csv(test_file_path, index_col=0)
     
+    # new_columns = pd.DataFrame({
+    # 'posA': [0] * len(self.train_data),
+    # 'negA': [0] * len(self.train_data),
+    # 'posB': [0] * len(self.train_data),
+    # 'negB': [0] * len(self.train_data)
+    # }, index=self.train_data.index)
+    # sensitive_col_index = self.train_data.columns.get_loc(self.sensitive_feature)
+    
+    # train_data_prev = self.train_data.iloc[:, :sensitive_col_index]
+    # train_data_next = self.train_data.iloc[:, sensitive_col_index:]
+    # self.train_data = pd.concat([train_data_prev, new_columns, train_data_next], axis=1)
+    
     # do the same for test data
+    # new_columns = pd.DataFrame({
+    # 'posA': [0] * len(self.test_data),
+    # 'negA': [0] * len(self.test_data),
+    # 'posB': [0] * len(self.test_data),
+    # 'negB': [0] * len(self.test_data)
+    # }, index=self.test_data.index)
+    # sensitive_col_index = self.test_data.columns.get_loc(self.sensitive_feature)
+    
+    # test_data_prev = self.test_data.iloc[:, :sensitive_col_index]
+    # test_data_next = self.test_data.iloc[:, sensitive_col_index:]
+    # self.test_data = pd.concat([test_data_prev, new_columns, test_data_next], axis=1)
+    
     A_train = self.train_data[self.sensitive_feature]
     A_test = self.test_data[self.sensitive_feature]
     A_str_train = A_train.map(self.dict_map)
@@ -578,6 +637,18 @@ class Super_human:
 
       self.train_data = pd.read_csv(train_file_path, index_col=0)
       
+      # new_columns = pd.DataFrame({
+      # 'posA': [0] * len(self.train_data),
+      # 'negA': [0] * len(self.train_data),
+      # 'posB': [0] * len(self.train_data),
+      # 'negB': [0] * len(self.train_data)
+      # }, index=self.train_data.index)
+      # sensitive_col_index = self.train_data.columns.get_loc(self.sensitive_feature)
+      
+      # train_data_prev = self.train_data.iloc[:, :sensitive_col_index]
+      # train_data_next = self.train_data.iloc[:, sensitive_col_index:]
+      # self.train_data = pd.concat([train_data_prev, new_columns, train_data_next], axis=1)
+      
       A = self.train_data[self.sensitive_feature]
       A_str = A.map(self.dict_map)
       # Extract the target
@@ -590,11 +661,37 @@ class Super_human:
       train_data_filename = "train_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
       train_file_path = os.path.join(self.train_data_path, train_data_filename)
       self.train_data = pd.read_csv(train_file_path, index_col=0)
+      
+      # new_columns = pd.DataFrame({
+      # 'posA': [0] * len(self.train_data),
+      # 'negA': [0] * len(self.train_data),
+      # 'posB': [0] * len(self.train_data),
+      # 'negB': [0] * len(self.train_data)
+      # }, index=self.train_data.index)
+      # sensitive_col_index = self.train_data.columns.get_loc(self.sensitive_feature)
+      
+      # train_data_prev = self.train_data.iloc[:, :sensitive_col_index]
+      # train_data_next = self.train_data.iloc[:, sensitive_col_index:]
+      # self.train_data = pd.concat([train_data_prev, new_columns, train_data_next], axis=1)
+      
       Y_train = self.train_data[self.label]
       ## read test data
       test_data_filename = "test_data_" + make_experiment_filename(dataset = self.dataset, demo_baseline = self.demo_baseline, lr_theta = self.lr_theta, num_of_demos = self.num_of_demos, noise_ratio = self.noise_ratio) + ".csv"
       test_file_path = os.path.join(self.test_data_path, test_data_filename)
       self.test_data = pd.read_csv(test_file_path, index_col=0)
+      
+      
+      # new_columns = pd.DataFrame({
+      #   'posA': [0] * len(self.test_data),
+      #   'negA': [0] * len(self.test_data),
+      #   'posB': [0] * len(self.test_data),
+      #   'negB': [0] * len(self.test_data)
+      #   }, index=self.test_data.index)
+      # sensitive_col_index = self.test_data.columns.get_loc(self.sensitive_feature)
+      
+      # test_data_prev = self.test_data.iloc[:, :sensitive_col_index]
+      # test_data_next = self.test_data.iloc[:, sensitive_col_index:]
+      # self.test_data = pd.concat([test_data_prev, new_columns, test_data_next], axis=1)
       
       A = self.test_data[self.sensitive_feature]
       A_str = A.map(self.dict_map)
@@ -680,7 +777,7 @@ class Super_human:
         temp_subdom_sum = 0
         subdom_tensor_sum = 0
         loss = 0
-        posA, negA, posB, negB = 0, 0, 0, 0
+        # posA, negA, posB, negB = 0, 0, 0, 0
         
         """
         demo_idxs_shuffled = np.random.shuffle(np.arange(len(demo_list))
@@ -690,6 +787,12 @@ class Super_human:
         demo_idxs_shuffled = np.random.permutation(len(demo_list))
         for j in tqdm(demo_idxs_shuffled):
           x = demo_list[j]
+          X = self.train_data.drop(columns=[self.label])
+          # X['posA'] = posA
+          # X['negA'] = negA
+          # X['posB'] = posB
+          # X['negB'] = negB
+          X = torch.tensor(X.values, dtype=torch.float32)
         # for j, x in enumerate(tqdm(demo_list)):
           X_test = X[x.idx_test.to_numpy(),:]
           if j == 0:
@@ -697,7 +800,16 @@ class Super_human:
           else:
             self.subdom_constant = self.get_subdom_constant(self.subdom_tensor)
           
-          preds = self.model_obj(X_test.cuda())        
+          preds = self.model_obj(X_test.cuda())       
+          # dist = torch.distributions.Categorical(preds)
+          # yts = dist.sample()
+          # Ats = X_test[:, -1].cuda()
+          
+          # posA += torch.sum((Ats == 1) & (yts == 1)).item()
+          # negA += torch.sum((Ats == 1) & (yts == 0)).item()
+          # posB += torch.sum((Ats == 2) & (yts == 1)).item()
+          # negB += torch.sum((Ats == 2) & (yts == 0)).item()
+           
           preds = preds[:, 1]
           
           for k in range(self.num_of_features):
